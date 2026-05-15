@@ -119,7 +119,11 @@ with tab1:
         fig.add_hline(y=0, line_dash="dash", line_color="gray")
         fig.update_traces(line_color=COLOR_NEUTRAL, line_width=2,
                           marker=dict(size=10, color=COLOR_NEUTRAL))
-        fig.update_layout(height=350, yaxis_title="Strokes vs par")
+        fig.update_layout(
+            height=350,
+            yaxis_title="Strokes vs par (lower = better)",
+            yaxis=dict(autorange="reversed"),
+        )
         st.plotly_chart(fig, use_container_width=True)
 
     with col2:
@@ -148,6 +152,7 @@ with tab1:
         .agg(Rounds=("Score_vs_Par", "count"),
              Avg_score=("Score_vs_Par", "mean"),
              Avg_C1R=("C1R_Pct", "mean"),
+             Avg_C1X=("C1X_Pct", "mean"),
              Avg_Fairway=("Fairway_Pct", "mean"))
         .round(2).reset_index().sort_values("Avg_score")
     )
@@ -239,46 +244,63 @@ with tab2:
 # ─── Tab 3: Distance Analysis ─────────────────────────────────────────────────
 with tab3:
     st.markdown(
-        "**Filtered to par 3 holes only** to avoid mixing distance distributions across par classes."
+        "Distance distributions differ by par, so analysis is split by par class."
     )
 
-    p3 = holes_f[holes_f["Par"] == 3].copy()
+    par_choice = st.radio(
+        "Par class",
+        options=[3, 4],
+        format_func=lambda p: f"Par {p}",
+        horizontal=True,
+    )
 
-    if len(p3) < 5:
-        st.warning("Not enough par 3 data with current filters.")
+    par_bins = {
+        3: ([0, 250, 325, 400, 1200],
+            ["<250 ft", "250–325 ft", "325–400 ft", "400+ ft"]),
+        4: ([0, 400, 500, 600, 2000],
+            ["<400 ft", "400–500 ft", "500–600 ft", "600+ ft"]),
+    }
+
+    ph = holes_f[holes_f["Par"] == par_choice].copy()
+
+    if len(ph) < 5:
+        st.warning(f"Not enough par {par_choice} data with current filters.")
     else:
         col1, col2 = st.columns([3, 2])
 
         with col1:
             st.subheader("Distance vs score")
             fig = px.scatter(
-                p3, x="Distance", y="Score_vs_Par",
+                ph, x="Distance", y="Score_vs_Par",
                 color="Score_Label",
                 color_discrete_map={"BIRDIE": COLOR_GOOD, "PAR": COLOR_NEUTRAL, "BOGEY": COLOR_BAD},
                 hover_data=["Course_Name", "Hole"],
                 trendline="ols", trendline_color_override="black",
             )
             fig.add_hline(y=0, line_color="gray", line_dash="dash")
-            fig.update_layout(height=400, xaxis_title="Distance (ft)", yaxis_title="Score vs par")
+            fig.update_layout(
+                height=400,
+                xaxis_title="Distance (ft)",
+                yaxis_title="Score vs par (lower = better)",
+                yaxis=dict(autorange="reversed"),
+            )
             st.plotly_chart(fig, use_container_width=True)
 
         with col2:
-            st.subheader("Correlations (par 3 only)")
+            st.subheader(f"Correlations (par {par_choice} only)")
             dist_corrs = {
-                "Distance vs Score": p3["Distance"].corr(p3["Score_vs_Par"]),
-                "Distance vs C1R": p3["Distance"].corr(p3["C1R_bin"]),
-                "Distance vs Fairway": p3["Distance"].corr(p3["Fairway_bin"]),
+                "Distance vs Score": ph["Distance"].corr(ph["Score_vs_Par"]),
+                "Distance vs C1R": ph["Distance"].corr(ph["C1R_bin"]),
+                "Distance vs Fairway": ph["Distance"].corr(ph["Fairway_bin"]),
             }
             for k, v in dist_corrs.items():
                 st.metric(k, f"{v:+.3f}")
 
         st.subheader("Performance by distance range")
-        p3["dist_bin"] = pd.cut(
-            p3["Distance"], bins=[0, 250, 325, 400, 1200],
-            labels=["<250 ft", "250–325 ft", "325–400 ft", "400+ ft"],
-        )
+        bins, labels = par_bins[par_choice]
+        ph["dist_bin"] = pd.cut(ph["Distance"], bins=bins, labels=labels)
         binned = (
-            p3.groupby("dist_bin", observed=True)
+            ph.groupby("dist_bin", observed=True)
             .agg(n=("Score_vs_Par", "count"),
                  Avg_score=("Score_vs_Par", "mean"),
                  Birdie_rate=("Score_vs_Par", lambda x: (x < 0).mean()),
@@ -299,7 +321,7 @@ with tab3:
                             mode="lines+markers", line_color="black", line_width=2)
             fig.update_layout(
                 height=350,
-                yaxis=dict(title="Avg score vs par"),
+                yaxis=dict(title="Avg score vs par (lower = better)", autorange="reversed"),
                 yaxis2=dict(title="C1R rate", overlaying="y", side="right",
                             range=[0, 1], tickformat=".0%"),
                 xaxis_title="Distance range",
