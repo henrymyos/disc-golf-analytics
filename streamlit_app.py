@@ -100,8 +100,9 @@ c5.metric("Birdie rate", f"{(holes_f['Score_vs_Par'] < 0).mean():.0%}")
 st.divider()
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["📈 Overview", "🎯 What Drives My Score", "📏 Distance Analysis", "📋 Raw Data"]
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    ["📈 Overview", "🎯 What Drives My Score", "📏 Distance Analysis",
+     "🥏 Shot Type", "📋 Raw Data"]
 )
 
 # ─── Tab 1: Overview ──────────────────────────────────────────────────────────
@@ -343,7 +344,9 @@ with tab3:
                         text=binned["Avg_score"].round(2), textposition="outside")
             fig.add_scatter(x=binned["dist_bin"], y=binned["C1R_rate"],
                             name="C1R rate", yaxis="y2",
-                            mode="lines+markers", line_color="black", line_width=2)
+                            mode="lines+markers",
+                            line=dict(color="#ff7a1a", width=3),
+                            marker=dict(size=10, color="#ff7a1a"))
             fig.update_layout(
                 height=350,
                 yaxis=dict(title="Avg score vs par (lower = better)", autorange="reversed"),
@@ -358,8 +361,106 @@ with tab3:
             st.dataframe(binned, use_container_width=True, hide_index=True)
 
 
-# ─── Tab 4: Raw data ──────────────────────────────────────────────────────────
+# ─── Tab 4: Shot Type ─────────────────────────────────────────────────────────
 with tab4:
+    st.markdown(
+        "**Tee-shot type only** (BH / FH / Other). Approach shots aren't tagged. "
+        "Useful for asking: which shot type actually keeps me in play and out of trouble?"
+    )
+
+    st_holes = holes_f[holes_f["Shot_Type"].notna() & (holes_f["Shot_Type"] != "")].copy()
+
+    if st_holes.empty:
+        st.warning("No shot-type data with current filters.")
+    else:
+        SHOT_COLORS = {"BH": COLOR_NEUTRAL, "FH": "#ff7a1a", "Other": "#888888"}
+
+        st.subheader("Tee-shot mix")
+        mix = st_holes["Shot_Type"].value_counts()
+        kpis = st.columns(len(mix))
+        for kpi, (name, n) in zip(kpis, mix.items()):
+            kpi.metric(f"{name} tee shots", f"{n}", f"{n / len(st_holes):.0%} of tracked")
+
+        agg = (
+            st_holes.groupby("Shot_Type")
+            .agg(Tee_shots=("Score_vs_Par", "count"),
+                 Avg_score=("Score_vs_Par", "mean"),
+                 Fairway_rate=("Fairway_bin", "mean"),
+                 C1R_rate=("C1R_bin", "mean"),
+                 OB_rate=("OB_bin", "mean"),
+                 Birdie_rate=("Score_vs_Par", lambda x: (x < 0).mean()))
+            .round(3).reset_index()
+        )
+
+        st.subheader("Per-shot-type breakdown")
+        col1, col2 = st.columns([3, 2])
+        with col1:
+            fig = px.bar(
+                agg, x="Shot_Type", y="Avg_score",
+                color="Shot_Type", color_discrete_map=SHOT_COLORS,
+                text="Avg_score",
+                labels={"Avg_score": "Avg score vs par", "Shot_Type": ""},
+            )
+            fig.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+            fig.add_hline(y=0, line_color="gray", line_dash="dash")
+            fig.update_layout(
+                height=350, showlegend=False,
+                yaxis=dict(title="Avg score vs par (lower = better)", autorange="reversed"),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        with col2:
+            st.dataframe(agg, use_container_width=True, hide_index=True)
+
+        st.subheader("Fairway, C1R, OB rates by shot type")
+        rates_long = agg.melt(
+            id_vars="Shot_Type",
+            value_vars=["Fairway_rate", "C1R_rate", "OB_rate"],
+            var_name="Metric", value_name="Rate",
+        )
+        rates_long["Metric"] = rates_long["Metric"].map({
+            "Fairway_rate": "Fairway hit",
+            "C1R_rate": "Green in reg (C1R)",
+            "OB_rate": "OB",
+        })
+        fig = px.bar(
+            rates_long, x="Metric", y="Rate", color="Shot_Type",
+            color_discrete_map=SHOT_COLORS, barmode="group",
+            text=rates_long["Rate"].map(lambda v: f"{v:.0%}"),
+        )
+        fig.update_traces(textposition="outside")
+        fig.update_layout(
+            height=350, yaxis=dict(tickformat=".0%", title="Rate"),
+            xaxis_title="",
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.subheader("Shot type by par class")
+        par_breakdown = (
+            st_holes.groupby(["Par", "Shot_Type"])
+            .agg(Holes=("Score_vs_Par", "count"),
+                 Avg_score=("Score_vs_Par", "mean"))
+            .round(2).reset_index()
+        )
+        st.dataframe(par_breakdown, use_container_width=True, hide_index=True)
+
+        # Dynamic interpretation
+        if len(agg) >= 2 and {"BH", "FH"}.issubset(set(agg["Shot_Type"])):
+            bh = agg[agg["Shot_Type"] == "BH"].iloc[0]
+            fh = agg[agg["Shot_Type"] == "FH"].iloc[0]
+            better = "backhand" if bh["Avg_score"] < fh["Avg_score"] else "forehand"
+            fwy_gap = (bh["Fairway_rate"] - fh["Fairway_rate"]) * 100
+            fwy_winner = "BH" if fwy_gap > 0 else "FH"
+            st.info(
+                f"**Read:** my **{better}** scores better on average "
+                f"(BH {bh['Avg_score']:+.2f} vs FH {fh['Avg_score']:+.2f} per hole). "
+                f"**{fwy_winner}** hits the fairway more often ({abs(fwy_gap):.0f} pp gap). "
+                f"Sample sizes — BH: {int(bh['Tee_shots'])} shots, FH: {int(fh['Tee_shots'])} shots. "
+                f"FH is mostly used on par 3s right now, so the comparison isn't apples-to-apples."
+            )
+
+
+# ─── Tab 5: Raw data ──────────────────────────────────────────────────────────
+with tab5:
     st.subheader("Rounds")
     st.dataframe(rounds_f, use_container_width=True, hide_index=True)
     st.subheader("Holes")
