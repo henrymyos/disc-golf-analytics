@@ -3,6 +3,8 @@ Disc Golf Performance Analytics
 A personal analytics dashboard for tracking and analyzing my disc golf rounds.
 """
 
+import os
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -24,17 +26,24 @@ COLOR_NEUTRAL = "#5a8bb8"
 
 
 # ─── Data loading ─────────────────────────────────────────────────────────────
+ROUNDS_PATH = "data/rounds_cleaned.csv"
+HOLES_PATH = "data/holes_cleaned.csv"
+
+
 @st.cache_data
-def load_data():
-    rounds = pd.read_csv("data/rounds_cleaned.csv", parse_dates=["Date"])
-    holes = pd.read_csv("data/holes_cleaned.csv", parse_dates=["Date"])
+def load_data(rounds_mtime: float, holes_mtime: float):
+    rounds = pd.read_csv(ROUNDS_PATH, parse_dates=["Date"])
+    holes = pd.read_csv(HOLES_PATH, parse_dates=["Date"])
     holes["C1R_bin"] = (holes["C1R"] == "YES").astype(int)
     holes["Fairway_bin"] = (holes["Fairway"] == "YES").astype(int)
     holes["OB_bin"] = (holes["OB"] == "YES").astype(int)
     return rounds, holes
 
 
-rounds, holes = load_data()
+rounds, holes = load_data(
+    os.path.getmtime(ROUNDS_PATH),
+    os.path.getmtime(HOLES_PATH),
+)
 
 # ─── Sidebar filters ──────────────────────────────────────────────────────────
 st.sidebar.title("Filters")
