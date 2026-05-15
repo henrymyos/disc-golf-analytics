@@ -1,0 +1,308 @@
+"""
+Disc Golf Performance Analytics
+A personal analytics dashboard for tracking and analyzing my disc golf rounds.
+"""
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+
+# ─── Page config ──────────────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="Disc Golf Analytics",
+    page_icon="🥏",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# Color palette
+COLOR_GOOD = "#1d9e75"
+COLOR_BAD = "#d4534f"
+COLOR_NEUTRAL = "#5a8bb8"
+
+
+# ─── Data loading ─────────────────────────────────────────────────────────────
+@st.cache_data
+def load_data():
+    rounds = pd.read_csv("data/rounds_cleaned.csv", parse_dates=["Date"])
+    holes = pd.read_csv("data/holes_cleaned.csv", parse_dates=["Date"])
+    holes["C1R_bin"] = (holes["C1R"] == "YES").astype(int)
+    holes["Fairway_bin"] = (holes["Fairway"] == "YES").astype(int)
+    holes["OB_bin"] = (holes["OB"] == "YES").astype(int)
+    return rounds, holes
+
+
+rounds, holes = load_data()
+
+# ─── Sidebar filters ──────────────────────────────────────────────────────────
+st.sidebar.title("Filters")
+
+selected_courses = st.sidebar.multiselect(
+    "Course",
+    options=sorted(rounds["Course_Name"].unique()),
+    default=sorted(rounds["Course_Name"].unique()),
+)
+
+min_date, max_date = rounds["Date"].min(), rounds["Date"].max()
+date_range = st.sidebar.date_input(
+    "Date range",
+    value=(min_date, max_date),
+    min_value=min_date,
+    max_value=max_date,
+)
+
+# Apply filters
+if isinstance(date_range, tuple) and len(date_range) == 2:
+    start, end = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])
+    rounds_f = rounds[
+        (rounds["Date"] >= start) & (rounds["Date"] <= end)
+        & (rounds["Course_Name"].isin(selected_courses))
+    ]
+    holes_f = holes[
+        (holes["Date"] >= start) & (holes["Date"] <= end)
+        & (holes["Course_Name"].isin(selected_courses))
+    ]
+else:
+    rounds_f = rounds[rounds["Course_Name"].isin(selected_courses)]
+    holes_f = holes[holes["Course_Name"].isin(selected_courses)]
+
+st.sidebar.divider()
+st.sidebar.markdown(
+    f"**Filtered data**\n\n{len(rounds_f)} rounds · {len(holes_f)} holes"
+)
+st.sidebar.markdown(
+    "Built by Henry · "
+    "[GitHub](https://github.com/your-username/disc-golf-analytics)"
+)
+
+
+# ─── Header ───────────────────────────────────────────────────────────────────
+st.title("🥏 Disc Golf Performance Analytics")
+st.markdown(
+    "Personal performance dashboard built on my own round data. "
+    "Tracking what actually drives my score — and what doesn't."
+)
+
+if rounds_f.empty:
+    st.warning("No data matches the current filters. Adjust the sidebar to see results.")
+    st.stop()
+
+# ─── KPI row ──────────────────────────────────────────────────────────────────
+c1, c2, c3, c4, c5 = st.columns(5)
+c1.metric("Rounds", len(rounds_f))
+c2.metric("Holes played", len(holes_f))
+c3.metric("Avg score vs par", f"{rounds_f['Score_vs_Par'].mean():.1f}")
+c4.metric("Best round", int(rounds_f["Score_vs_Par"].min()))
+c5.metric("Birdie rate", f"{(holes_f['Score_vs_Par'] < 0).mean():.0%}")
+
+st.divider()
+
+# ─── Tabs ─────────────────────────────────────────────────────────────────────
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["📈 Overview", "🎯 What Drives My Score", "📏 Distance Analysis", "📋 Raw Data"]
+)
+
+# ─── Tab 1: Overview ──────────────────────────────────────────────────────────
+with tab1:
+    col1, col2 = st.columns([3, 2])
+
+    with col1:
+        st.subheader("Score trend over time")
+        fig = px.line(
+            rounds_f.sort_values("Date"),
+            x="Date", y="Score_vs_Par",
+            markers=True,
+            hover_data=["Course_Name", "Layout", "Conditions"],
+        )
+        fig.add_hline(y=0, line_dash="dash", line_color="gray")
+        fig.update_traces(line_color=COLOR_NEUTRAL, line_width=2,
+                          marker=dict(size=10, color=COLOR_NEUTRAL))
+        fig.update_layout(height=350, yaxis_title="Strokes vs par")
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        st.subheader("Score distribution")
+        dist = holes_f["Score_Label"].value_counts(normalize=True).mul(100).round(1)
+        order = ["EAGLE", "BIRDIE", "PAR", "BOGEY", "DOUBLE BOGEY", "TRIPLE BOGEY"]
+        dist = dist.reindex([o for o in order if o in dist.index])
+        color_map = {
+            "EAGLE": "#0d6e4e", "BIRDIE": COLOR_GOOD, "PAR": COLOR_NEUTRAL,
+            "BOGEY": COLOR_BAD, "DOUBLE BOGEY": "#a3322f", "TRIPLE BOGEY": "#7a2622",
+        }
+        fig = px.bar(
+            dist.reset_index(),
+            x="Score_Label", y="proportion",
+            color="Score_Label", color_discrete_map=color_map,
+            text="proportion",
+        )
+        fig.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
+        fig.update_layout(height=350, showlegend=False,
+                          xaxis_title="", yaxis_title="% of holes")
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("Performance by course")
+    course_stats = (
+        rounds_f.groupby("Course_Name")
+        .agg(Rounds=("Score_vs_Par", "count"),
+             Avg_score=("Score_vs_Par", "mean"),
+             Avg_C1R=("C1R_Pct", "mean"),
+             Avg_Fairway=("Fairway_Pct", "mean"))
+        .round(2).reset_index().sort_values("Avg_score")
+    )
+    st.dataframe(course_stats, use_container_width=True, hide_index=True)
+
+
+# ─── Tab 2: What Drives My Score ──────────────────────────────────────────────
+with tab2:
+    st.markdown(
+        "**The big question:** of all my tracked stats, which ones actually correlate "
+        "with shooting a low score?"
+    )
+
+    skill_cols = ["Fairway_Pct", "C1R_Pct", "C2R_Pct", "C1X_Pct", "OB_Pct"]
+    available = [c for c in skill_cols if c in rounds_f.columns and rounds_f[c].notna().any()]
+
+    if len(rounds_f) >= 2 and available:
+        corrs = (
+            rounds_f[available + ["Score_vs_Par"]]
+            .corr()["Score_vs_Par"].drop("Score_vs_Par").sort_values()
+        )
+
+        col1, col2 = st.columns([3, 2])
+        with col1:
+            st.subheader("Stat correlations with round score")
+            fig = px.bar(
+                x=corrs.values, y=corrs.index, orientation="h",
+                color=corrs.values,
+                color_continuous_scale=[(0, COLOR_GOOD), (0.5, "lightgray"), (1, COLOR_BAD)],
+                color_continuous_midpoint=0,
+                labels={"x": "Correlation with Score_vs_Par", "y": ""},
+            )
+            fig.add_vline(x=0, line_color="gray")
+            fig.update_layout(height=350, coloraxis_showscale=False)
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            st.subheader("Interpretation")
+            st.markdown(
+                """
+                **More negative = stat improves your score.**
+
+                - **C1R % is the dominant driver.** Hitting greens in regulation
+                  matters far more than putting well or hitting fairways.
+                - Counterintuitively, fairway % barely correlates with score
+                  for me — I hit fairways consistently regardless.
+                - With only a handful of rounds these numbers will keep shifting.
+                """
+            )
+
+    st.subheader("Hole-level impact: hitting C1R vs not")
+    c1r_holes = holes_f.groupby("C1R")["Score_vs_Par"].agg(["mean", "count"]).round(2)
+    c1r_holes.columns = ["Avg score vs par", "Holes"]
+    c1r_holes = c1r_holes.reset_index()
+
+    fig = px.bar(
+        c1r_holes, x="C1R", y="Avg score vs par",
+        color="C1R", color_discrete_map={"YES": COLOR_GOOD, "NO": COLOR_BAD},
+        text="Avg score vs par", hover_data=["Holes"],
+    )
+    fig.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+    fig.add_hline(y=0, line_color="gray")
+    fig.update_layout(height=300, showlegend=False, xaxis_title="Hit green in regulation?")
+    st.plotly_chart(fig, use_container_width=True)
+
+    yes_n = (holes_f["C1R"] == "YES").sum()
+    no_n = (holes_f["C1R"] == "NO").sum()
+    if yes_n > 0 and no_n > 0:
+        swing = (holes_f[holes_f["C1R"] == "NO"]["Score_vs_Par"].mean()
+                 - holes_f[holes_f["C1R"] == "YES"]["Score_vs_Par"].mean())
+        st.info(
+            f"**Per-hole swing:** {swing:.2f} strokes. "
+            f"If I improved my C1R rate by 10 percentage points (≈2 holes per round), "
+            f"I'd save roughly {swing * 2:.1f} strokes per round."
+        )
+
+
+# ─── Tab 3: Distance Analysis ─────────────────────────────────────────────────
+with tab3:
+    st.markdown(
+        "**Filtered to par 3 holes only** to avoid mixing distance distributions across par classes."
+    )
+
+    p3 = holes_f[holes_f["Par"] == 3].copy()
+
+    if len(p3) < 5:
+        st.warning("Not enough par 3 data with current filters.")
+    else:
+        col1, col2 = st.columns([3, 2])
+
+        with col1:
+            st.subheader("Distance vs score")
+            fig = px.scatter(
+                p3, x="Distance", y="Score_vs_Par",
+                color="Score_Label",
+                color_discrete_map={"BIRDIE": COLOR_GOOD, "PAR": COLOR_NEUTRAL, "BOGEY": COLOR_BAD},
+                hover_data=["Course_Name", "Hole"],
+                trendline="ols", trendline_color_override="black",
+            )
+            fig.add_hline(y=0, line_color="gray", line_dash="dash")
+            fig.update_layout(height=400, xaxis_title="Distance (ft)", yaxis_title="Score vs par")
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            st.subheader("Correlations (par 3 only)")
+            dist_corrs = {
+                "Distance vs Score": p3["Distance"].corr(p3["Score_vs_Par"]),
+                "Distance vs C1R": p3["Distance"].corr(p3["C1R_bin"]),
+                "Distance vs Fairway": p3["Distance"].corr(p3["Fairway_bin"]),
+            }
+            for k, v in dist_corrs.items():
+                st.metric(k, f"{v:+.3f}")
+
+        st.subheader("Performance by distance range")
+        p3["dist_bin"] = pd.cut(
+            p3["Distance"], bins=[0, 250, 325, 400, 1200],
+            labels=["<250 ft", "250–325 ft", "325–400 ft", "400+ ft"],
+        )
+        binned = (
+            p3.groupby("dist_bin", observed=True)
+            .agg(n=("Score_vs_Par", "count"),
+                 Avg_score=("Score_vs_Par", "mean"),
+                 Birdie_rate=("Score_vs_Par", lambda x: (x < 0).mean()),
+                 C1R_rate=("C1R_bin", "mean"))
+            .round(3).reset_index()
+        )
+
+        col1, col2 = st.columns([3, 2])
+        with col1:
+            fig = go.Figure()
+            fig.add_bar(x=binned["dist_bin"], y=binned["Avg_score"],
+                        name="Avg score vs par",
+                        marker_color=[COLOR_GOOD if x < 0 else COLOR_BAD
+                                      for x in binned["Avg_score"]],
+                        text=binned["Avg_score"].round(2), textposition="outside")
+            fig.add_scatter(x=binned["dist_bin"], y=binned["C1R_rate"],
+                            name="C1R rate", yaxis="y2",
+                            mode="lines+markers", line_color="black", line_width=2)
+            fig.update_layout(
+                height=350,
+                yaxis=dict(title="Avg score vs par"),
+                yaxis2=dict(title="C1R rate", overlaying="y", side="right",
+                            range=[0, 1], tickformat=".0%"),
+                xaxis_title="Distance range",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            st.dataframe(binned, use_container_width=True, hide_index=True)
+
+
+# ─── Tab 4: Raw data ──────────────────────────────────────────────────────────
+with tab4:
+    st.subheader("Rounds")
+    st.dataframe(rounds_f, use_container_width=True, hide_index=True)
+    st.subheader("Holes")
+    st.dataframe(holes_f, use_container_width=True, hide_index=True)
