@@ -426,9 +426,15 @@ with tab4:
             )
             fig.update_traces(texttemplate="%{text:.2f}", textposition="outside")
             fig.add_hline(y=0, line_color="gray", line_dash="dash")
+
+            y_min = min(float(agg["Avg_score"].min()), 0.0)
+            y_max = max(float(agg["Avg_score"].max()), 0.0)
+            pad = max(0.25, (y_max - y_min) * 0.25)
+            y_range = [y_max + pad, y_min - pad]
+
             fig.update_layout(
                 height=350, showlegend=False,
-                yaxis=dict(title="Avg score vs par (lower = better)", autorange="reversed"),
+                yaxis=dict(title="Avg score vs par (lower = better)", range=y_range),
             )
             st.plotly_chart(fig, use_container_width=True)
         with col2:
