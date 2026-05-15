@@ -296,6 +296,31 @@ with tab3:
             for k, v in dist_corrs.items():
                 st.metric(k, f"{v:+.3f}")
 
+            def strength(v):
+                a = abs(v)
+                if a < 0.1: return "essentially no"
+                if a < 0.3: return "a weak"
+                if a < 0.5: return "a moderate"
+                return "a strong"
+
+            s_score = dist_corrs["Distance vs Score"]
+            s_c1r = dist_corrs["Distance vs C1R"]
+            s_fwy = dist_corrs["Distance vs Fairway"]
+
+            st.markdown(
+                f"**What these mean:**\n\n"
+                f"- **Distance vs Score ({s_score:+.2f})** — {strength(s_score)} "
+                f"{'positive' if s_score > 0 else 'negative'} relationship: longer holes tend to "
+                f"score {'worse (more strokes over par)' if s_score > 0 else 'better'}.\n"
+                f"- **Distance vs C1R ({s_c1r:+.2f})** — {strength(s_c1r)} "
+                f"{'positive' if s_c1r > 0 else 'negative'} relationship: as distance grows, "
+                f"my chance of reaching the green in regulation "
+                f"{'goes up' if s_c1r > 0 else 'drops'}.\n"
+                f"- **Distance vs Fairway ({s_fwy:+.2f})** — {strength(s_fwy)} "
+                f"{'positive' if s_fwy > 0 else 'negative'} relationship: longer drives are "
+                f"{'more' if s_fwy > 0 else 'less'} likely to stay in the fairway."
+            )
+
         st.subheader("Performance by distance range")
         bins, labels = par_bins[par_choice]
         ph["dist_bin"] = pd.cut(ph["Distance"], bins=bins, labels=labels)
