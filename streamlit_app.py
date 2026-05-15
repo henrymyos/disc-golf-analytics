@@ -368,10 +368,17 @@ with tab4:
         "Useful for asking: which shot type actually keeps me in play and out of trouble?"
     )
 
-    st_holes = holes_f[holes_f["Shot_Type"].notna() & (holes_f["Shot_Type"] != "")].copy()
+    if "Shot_Type" not in holes_f.columns:
+        st.warning("Shot type data isn't available in the current dataset.")
+        st_holes = holes_f.iloc[0:0]
+    else:
+        st_holes = holes_f[
+            holes_f["Shot_Type"].notna() & (holes_f["Shot_Type"] != "")
+        ].copy()
 
     if st_holes.empty:
-        st.warning("No shot-type data with current filters.")
+        if "Shot_Type" in holes_f.columns:
+            st.warning("No shot-type data with current filters.")
     else:
         SHOT_COLORS = {"BH": COLOR_NEUTRAL, "FH": "#ff7a1a", "Other": "#888888"}
 
