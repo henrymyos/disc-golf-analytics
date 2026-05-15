@@ -74,7 +74,7 @@ st.sidebar.markdown(
 )
 st.sidebar.markdown(
     "Built by Henry · "
-    "[GitHub](https://github.com/your-username/disc-golf-analytics)"
+    "[GitHub](https://github.com/henrymyos/disc-golf-analytics)"
 )
 
 
