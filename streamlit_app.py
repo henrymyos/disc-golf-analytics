@@ -186,16 +186,27 @@ with tab2:
 
         with col2:
             st.subheader("Interpretation")
-            st.markdown(
-                """
-                **More negative = stat improves your score.**
+            stat_names = {
+                "Fairway_Pct": "Fairway accuracy",
+                "C1R_Pct": "Greens in regulation (C1R)",
+                "C2R_Pct": "Reaching Circle 2 (C2R)",
+                "C1X_Pct": "Putting from C1 (C1X)",
+                "OB_Pct": "Avoiding OB",
+            }
+            strongest = corrs.abs().idxmax()
+            weakest = corrs.abs().idxmin()
+            sv = corrs[strongest]
+            direction = "lower" if sv < 0 else "higher"
 
-                - **C1R % is the dominant driver.** Hitting greens in regulation
-                  matters far more than putting well or hitting fairways.
-                - Counterintuitively, fairway % barely correlates with score
-                  for me — I hit fairways consistently regardless.
-                - With only a handful of rounds these numbers will keep shifting.
-                """
+            st.markdown(
+                f"**More negative correlation = stat improves my score.**\n\n"
+                f"- **{stat_names.get(strongest, strongest)} is currently my strongest predictor** "
+                f"({sv:+.2f}). When this stat goes up, my score tends to be {direction}.\n"
+                f"- **{stat_names.get(weakest, weakest)}** has the weakest relationship "
+                f"to my score right now.\n"
+                f"- ⚠️ With only **{len(rounds_f)} rounds** in this view, these correlations are "
+                f"unstable — the strongest predictor has flipped between rounds before. "
+                f"Treat this as a working hypothesis, not a conclusion."
             )
 
     st.subheader("Hole-level impact: hitting C1R vs not")
