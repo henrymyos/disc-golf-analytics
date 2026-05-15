@@ -356,9 +356,16 @@ with tab3:
                             mode="lines+markers",
                             line=dict(color="#ff7a1a", width=3),
                             marker=dict(size=10, color="#ff7a1a"))
+
+            y_min = float(binned["Avg_score"].min())
+            y_max = float(binned["Avg_score"].max())
+            pad = max(0.25, (y_max - y_min) * 0.25)
+            # axis is reversed: pass [high, low] so the "negative end" gets headroom for labels
+            y_range = [y_max + pad, y_min - pad]
+
             fig.update_layout(
                 height=350,
-                yaxis=dict(title="Avg score vs par (lower = better)", autorange="reversed"),
+                yaxis=dict(title="Avg score vs par (lower = better)", range=y_range),
                 yaxis2=dict(title="C1R rate", overlaying="y", side="right",
                             range=[0, 1], tickformat=".0%"),
                 xaxis_title="Distance range",
