@@ -10,6 +10,9 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.metrics import mean_absolute_error
+from sklearn.model_selection import LeaveOneOut, cross_val_predict
 
 # ─── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -109,9 +112,9 @@ c5.metric("Birdie rate", f"{(holes_f['Score_vs_Par'] < 0).mean():.0%}")
 st.divider()
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
     ["📈 Overview", "🎯 What Drives My Score", "📏 Distance Analysis",
-     "🥏 Shot Type", "📋 Raw Data"]
+     "🥏 Shot Type", "🤖 Score Model", "📋 Raw Data"]
 )
 
 # ─── Tab 1: Overview ──────────────────────────────────────────────────────────
@@ -488,8 +491,124 @@ with tab4:
             )
 
 
-# ─── Tab 5: Raw data ──────────────────────────────────────────────────────────
+# ─── Tab 5: Score Model ───────────────────────────────────────────────────────
 with tab5:
+    st.markdown(
+        "A simple linear model predicting **round score (vs par)** from skill stats. "
+        "Trained on every round in the current filters; honesty about the tiny sample is "
+        "the point — predictions show a directional read, not an oracle."
+    )
+
+    feature_cols = ["Fairway_Pct", "C1R_Pct", "C2R_Pct", "C1X_Pct", "OB_Pct"]
+    feats_available = [c for c in feature_cols if c in rounds_f.columns]
+    model_df = rounds_f.dropna(subset=feats_available + ["Score_vs_Par"])
+
+    if len(model_df) < 4:
+        st.warning(
+            f"Need at least 4 rounds with complete stats to fit a model; "
+            f"current view has {len(model_df)}."
+        )
+    else:
+        X = model_df[feats_available].values
+        y = model_df["Score_vs_Par"].values
+
+        model_choice = st.radio(
+            "Model",
+            options=["Linear regression", "Ridge (regularized)"],
+            horizontal=True,
+            help="Ridge shrinks coefficients toward zero; safer when features are correlated.",
+        )
+        model = LinearRegression() if model_choice == "Linear regression" else Ridge(alpha=1.0)
+
+        # Leave-one-out CV for an honest out-of-sample read
+        loo_preds = cross_val_predict(model, X, y, cv=LeaveOneOut())
+        loo_mae = mean_absolute_error(y, loo_preds)
+
+        # Fit on all data for coefficient inspection and what-if
+        model.fit(X, y)
+        train_pred = model.predict(X)
+        train_mae = mean_absolute_error(y, train_pred)
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Rounds in fit", len(model_df))
+        col2.metric("Leave-one-out MAE", f"{loo_mae:.2f} strokes",
+                    help="Average prediction error on rounds the model didn't see during training.")
+        col3.metric("Training MAE", f"{train_mae:.2f} strokes",
+                    help="Lower than LOO MAE means the model is overfitting — expected with this sample size.")
+
+        st.subheader("Predicted vs actual round score")
+        pred_df = pd.DataFrame({
+            "Round": model_df["Date"].dt.strftime("%Y-%m-%d") + " · " + model_df["Course_Name"],
+            "Actual": y,
+            "Predicted (LOO)": loo_preds,
+        })
+        fig = px.scatter(
+            pred_df, x="Actual", y="Predicted (LOO)",
+            hover_data=["Round"],
+            labels={"Actual": "Actual score vs par", "Predicted (LOO)": "Predicted (LOO)"},
+        )
+        lo = min(y.min(), loo_preds.min()) - 1
+        hi = max(y.max(), loo_preds.max()) + 1
+        fig.add_shape(type="line", x0=lo, x1=hi, y0=lo, y1=hi,
+                      line=dict(color="gray", dash="dash"))
+        fig.update_traces(marker=dict(size=12, color=COLOR_NEUTRAL))
+        fig.update_layout(height=380)
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.subheader("Feature coefficients")
+        coefs = pd.DataFrame({
+            "Stat": feats_available,
+            "Coefficient": model.coef_,
+        }).sort_values("Coefficient")
+        coefs["Direction"] = coefs["Coefficient"].apply(
+            lambda c: "↓ score (better)" if c < 0 else "↑ score (worse)"
+        )
+        fig = px.bar(
+            coefs, x="Coefficient", y="Stat", orientation="h",
+            color="Coefficient",
+            color_continuous_scale=[(0, COLOR_GOOD), (0.5, "lightgray"), (1, COLOR_BAD)],
+            color_continuous_midpoint=0,
+            text=coefs["Coefficient"].round(2),
+        )
+        fig.update_traces(textposition="outside")
+        fig.add_vline(x=0, line_color="gray")
+        fig.update_layout(height=300, coloraxis_showscale=False)
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.caption(
+            "Coefficients are on the raw 0–1 scale of each stat. A coefficient of −5 on a stat "
+            "means a 10-percentage-point gain in that stat predicts ~0.5 strokes lower per round."
+        )
+
+        st.subheader("What-if: simulate a round")
+        st.markdown("Set each skill level and see the model's predicted score.")
+        means = model_df[feats_available].mean()
+        what_if = {}
+        cols = st.columns(len(feats_available))
+        for col, feat in zip(cols, feats_available):
+            what_if[feat] = col.slider(
+                feat, min_value=0.0, max_value=1.0,
+                value=float(round(means[feat], 2)), step=0.01,
+            )
+
+        x_new = np.array([[what_if[f] for f in feats_available]])
+        pred_score = float(model.predict(x_new)[0])
+        st.metric(
+            "Predicted round score vs par",
+            f"{pred_score:+.1f}",
+            delta=f"{pred_score - model_df['Score_vs_Par'].mean():+.1f} vs my average",
+            delta_color="inverse",
+        )
+
+        st.info(
+            f"⚠️ With only **{len(model_df)} rounds**, the LOO MAE of "
+            f"{loo_mae:.1f} strokes is on the order of my round-to-round spread. "
+            f"Treat the model as a coefficient explorer, not a forecaster."
+        )
+
+
+# ─── Tab 6: Raw data ──────────────────────────────────────────────────────────
+with tab6:
     st.subheader("Rounds")
     st.dataframe(rounds_f, use_container_width=True, hide_index=True)
     st.subheader("Holes")

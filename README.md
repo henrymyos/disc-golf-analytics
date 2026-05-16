@@ -45,6 +45,8 @@ Two related tables joined on `Date` + `Course_Name`:
 - **Overview** — score trend (inverted axis so better scores plot higher), score distribution, per-course summary.
 - **What Drives My Score** — round-level correlations with dynamic interpretation, plus the per-hole swing from hitting vs missing C1R.
 - **Distance Analysis** — par 3 / par 4 toggle, distance-vs-score scatter, binned performance tables, and a written interpretation of each correlation.
+- **Shot Type** — tee-shot BH vs FH comparison across avg score, fairway hit rate, C1R rate, and OB rate, with par-class breakdown.
+- **Score Model** — scikit-learn linear / ridge regression predicting round score from skill stats, with leave-one-out CV, coefficient inspection, and a what-if slider for simulating a round. Calls out the overfitting risk explicitly given the current sample size.
 - **Raw Data** — the underlying rounds and holes tables.
 
 ## Running locally
