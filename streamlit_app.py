@@ -581,14 +581,29 @@ with tab5:
         )
 
         st.subheader("What-if: simulate a round")
-        st.markdown("Set each skill level and see the model's predicted score.")
+        st.markdown(
+            "Set each skill level and see the model's predicted score. "
+            "Sliders are clamped to the range the model has actually seen — "
+            "predictions outside that band would be pure extrapolation."
+        )
         means = model_df[feats_available].mean()
+        mins = model_df[feats_available].min()
+        maxs = model_df[feats_available].max()
         what_if = {}
         cols = st.columns(len(feats_available))
         for col, feat in zip(cols, feats_available):
+            lo = float(round(mins[feat], 2))
+            hi = float(round(maxs[feat], 2))
+            # Avoid degenerate slider when min == max
+            if hi - lo < 0.01:
+                lo = max(0.0, lo - 0.05)
+                hi = min(1.0, hi + 0.05)
+            default = float(round(means[feat], 2))
+            default = min(max(default, lo), hi)
             what_if[feat] = col.slider(
-                feat, min_value=0.0, max_value=1.0,
-                value=float(round(means[feat], 2)), step=0.01,
+                feat, min_value=lo, max_value=hi,
+                value=default, step=0.01,
+                help=f"Observed range in current data: {mins[feat]:.0%} – {maxs[feat]:.0%}",
             )
 
         x_new = np.array([[what_if[f] for f in feats_available]])
