@@ -33,10 +33,27 @@ ROUNDS_PATH = "data/rounds_cleaned.csv"
 HOLES_PATH = "data/holes_cleaned.csv"
 
 
+# Score_vs_Par is derived from Score_Label + Par. ACE is absolute (1 stroke),
+# the rest are offsets from par. Labels cap at TRIPLE BOGEY; a worse hole needs
+# a new entry here.
+LABEL_OFFSETS = {
+    "EAGLE": -2, "BIRDIE": -1, "PAR": 0,
+    "BOGEY": 1, "DOUBLE BOGEY": 2, "TRIPLE BOGEY": 3,
+}
+
+
 @st.cache_data
 def load_data(rounds_mtime: float, holes_mtime: float):
     rounds = pd.read_csv(ROUNDS_PATH, parse_dates=["Date"])
     holes = pd.read_csv(HOLES_PATH, parse_dates=["Date"])
+    unknown = set(holes["Score_Label"].unique()) - set(LABEL_OFFSETS) - {"ACE"}
+    if unknown:
+        st.error(f"Unknown Score_Label values in {HOLES_PATH}: {sorted(unknown)}")
+        st.stop()
+    holes["Score_vs_Par"] = holes["Score_Label"].map(LABEL_OFFSETS)
+    is_ace = holes["Score_Label"] == "ACE"
+    holes.loc[is_ace, "Score_vs_Par"] = 1 - holes.loc[is_ace, "Par"]
+    holes["Score_vs_Par"] = holes["Score_vs_Par"].astype(int)
     holes["C1R_bin"] = (holes["C1R"] == "YES").astype(int)
     holes["Fairway_bin"] = (holes["Fairway"] == "YES").astype(int)
     holes["OB_bin"] = (holes["OB"] == "YES").astype(int)
@@ -142,10 +159,10 @@ with tab1:
     with col2:
         st.subheader("Score distribution")
         dist = holes_f["Score_Label"].value_counts(normalize=True).mul(100).round(1)
-        order = ["EAGLE", "BIRDIE", "PAR", "BOGEY", "DOUBLE BOGEY", "TRIPLE BOGEY"]
+        order = ["ACE", "EAGLE", "BIRDIE", "PAR", "BOGEY", "DOUBLE BOGEY", "TRIPLE BOGEY"]
         dist = dist.reindex([o for o in order if o in dist.index])
         color_map = {
-            "EAGLE": "#0d6e4e", "BIRDIE": COLOR_GOOD, "PAR": COLOR_NEUTRAL,
+            "ACE": "#064a33", "EAGLE": "#0d6e4e", "BIRDIE": COLOR_GOOD, "PAR": COLOR_NEUTRAL,
             "BOGEY": COLOR_BAD, "DOUBLE BOGEY": "#a3322f", "TRIPLE BOGEY": "#7a2622",
         }
         fig = px.bar(
@@ -286,7 +303,8 @@ with tab3:
             fig = px.scatter(
                 ph, x="Distance", y="Score_vs_Par",
                 color="Score_Label",
-                color_discrete_map={"BIRDIE": COLOR_GOOD, "PAR": COLOR_NEUTRAL, "BOGEY": COLOR_BAD},
+                color_discrete_map={"ACE": "#064a33", "EAGLE": "#0d6e4e", "BIRDIE": COLOR_GOOD,
+                                    "PAR": COLOR_NEUTRAL, "BOGEY": COLOR_BAD},
                 hover_data=["Course_Name", "Hole"],
                 trendline="ols", trendline_color_override="black",
             )
