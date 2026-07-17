@@ -415,6 +415,12 @@ with tab4:
             holes_f["Shot_Type"].notna() & (holes_f["Shot_Type"] != "")
         ].copy()
 
+        # Hide shot types with too few shots to be meaningful (e.g. FH ROLLER).
+        MIN_SHOTS = 20
+        type_counts = st_holes["Shot_Type"].value_counts()
+        kept_types = type_counts[type_counts >= MIN_SHOTS].index
+        st_holes = st_holes[st_holes["Shot_Type"].isin(kept_types)].copy()
+
     if st_holes.empty:
         if "Shot_Type" in holes_f.columns:
             st.warning("No shot-type data with current filters.")
