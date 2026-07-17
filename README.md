@@ -2,7 +2,7 @@
 
 A personal analytics dashboard built on data I collected from my own disc golf rounds. The goal was to use real data analysis techniques to find out what actually drives my scores — and what doesn't.
 
-**Live demo:** [insert your Streamlit Cloud URL here]
+**Live demo:** [henry-disc-golf-analytics.streamlit.app](https://henry-disc-golf-analytics.streamlit.app/)
 
 ## What the data shows so far
 
