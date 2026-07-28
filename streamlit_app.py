@@ -34,11 +34,12 @@ HOLES_PATH = "data/holes_cleaned.csv"
 
 
 # Score_vs_Par is derived from Score_Label + Par. ACE is absolute (1 stroke),
-# the rest are offsets from par. Labels cap at QUADRUPLE BOGEY; a worse hole
+# the rest are offsets from par. Labels cap at SEXTUPLE BOGEY; a worse hole
 # needs a new entry here.
 LABEL_OFFSETS = {
     "EAGLE": -2, "BIRDIE": -1, "PAR": 0,
     "BOGEY": 1, "DOUBLE BOGEY": 2, "TRIPLE BOGEY": 3, "QUADRUPLE BOGEY": 4,
+    "QUINTUPLE BOGEY": 5, "SEXTUPLE BOGEY": 6,
 }
 
 
@@ -160,12 +161,14 @@ with tab1:
         st.subheader("Score distribution")
         dist = holes_f["Score_Label"].value_counts(normalize=True).mul(100).round(1)
         order = ["ACE", "EAGLE", "BIRDIE", "PAR", "BOGEY",
-                 "DOUBLE BOGEY", "TRIPLE BOGEY", "QUADRUPLE BOGEY"]
+                 "DOUBLE BOGEY", "TRIPLE BOGEY", "QUADRUPLE BOGEY",
+                 "QUINTUPLE BOGEY", "SEXTUPLE BOGEY"]
         dist = dist.reindex([o for o in order if o in dist.index])
         color_map = {
             "ACE": "#064a33", "EAGLE": "#0d6e4e", "BIRDIE": COLOR_GOOD, "PAR": COLOR_NEUTRAL,
             "BOGEY": COLOR_BAD, "DOUBLE BOGEY": "#a3322f", "TRIPLE BOGEY": "#7a2622",
-            "QUADRUPLE BOGEY": "#521b18",
+            "QUADRUPLE BOGEY": "#521b18", "QUINTUPLE BOGEY": "#3b1311",
+            "SEXTUPLE BOGEY": "#290d0c",
         }
         fig = px.bar(
             dist.reset_index(),
