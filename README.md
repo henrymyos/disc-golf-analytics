@@ -6,13 +6,13 @@ A personal analytics dashboard built on data I collected from my own disc golf r
 
 ## What the data shows so far
 
-After 48 rounds (940 holes) played April 29 – July 26, 2026 across 15 courses:
+After 55 rounds (1,057 holes) played April 29 – August 17, 2026 across 17 courses:
 
-- **Average round: 5.2 strokes under par** (best round: −15). Hole mix: 41% under par (including 6 eagles and one ace — Bunker #7, 250 ft, July 7), 47% pars, 12% over par. The scoring profile is getting less low-variance — the last stretch of rounds added the first quintuple- and sextuple-bogey territory (a 9 on a 477-ft par 3, thanks to OB).
-- **The "strongest predictor" flipped yet again.** After 6 rounds, C1X putting led (−0.45) and greens in regulation looked irrelevant (−0.10). By 39 rounds C1R % led (−0.71). Now C2R % is narrowly on top (−0.81) with C1R % right behind (−0.78), while C1X sits at −0.28. OB % has also emerged as a major correlate (+0.79).
-- **Fairway % went from noise to signal** — +0.09 after 6 rounds, −0.66 now. A live lesson in how unstable small-sample correlations are.
-- **Missing the green costs about a full stroke** — holes where I miss C1R average 1.03 strokes worse than holes where I hit it, consistent with green-hit rates being the strongest round-level predictors.
-- **Distance still matters mostly through C1R, not directly** — longer par-3s correlate only mildly with score (+0.27); the damage runs through the drop in green-hit rate. Par-4 sample is now 233 holes, enough to start trusting its numbers.
+- **Average round: 4.9 strokes under par** (best round: −15). Hole mix: 41% under par (including 6 eagles and two aces — Bunker #7, 250 ft, July 7 and Bunker #6, 320 ft, August 17), 46% pars, 13% over par. Variance is still concentrated in a single blow-up: the one sextuple bogey on record, a 9 on a 477-ft par 3, thanks to OB.
+- **The "strongest predictor" flipped yet again.** After 6 rounds, C1X putting led (−0.45) and greens in regulation looked irrelevant (−0.10). By 39 rounds C1R % led (−0.71). Now the top three are effectively tied, with OB % nominally first: OB +0.81, C2R % −0.81, C1R % −0.79, while C1X still sits at −0.28. Avoiding OB has gone from a footnote to the single largest correlate.
+- **Fairway % went from noise to signal** — +0.09 after 6 rounds, −0.65 now. A live lesson in how unstable small-sample correlations are.
+- **Missing the green costs about a full stroke** — holes where I miss C1R average 1.04 strokes worse than holes where I hit it, consistent with green-hit rates being the strongest round-level predictors.
+- **Distance still matters mostly through C1R, not directly** — longer par-3s correlate only mildly with score (+0.26); the damage runs through the drop in green-hit rate. Par-4 sample is now 269 holes, enough to start trusting its numbers.
 
 ## Tech stack
 
@@ -60,7 +60,7 @@ streamlit run streamlit_app.py
 
 ## Next steps
 
-- ~~Log more rounds (target: 20+) to firm up correlations.~~ Done — 48 rounds and counting.
-- Keep building the par-4 sample — 233 holes now vs 684 par-3 holes (par 5s are still rare at 23).
+- ~~Log more rounds (target: 20+) to firm up correlations.~~ Done — 55 rounds and counting.
+- Keep building the par-4 sample — 269 holes now vs 763 par-3 holes (par 5s are still rare at 25).
 - Add drive-distance and approach-distance tracking per hole.
 - Revisit the score model now that the sample is big enough to take the coefficients seriously.
