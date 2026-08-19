@@ -27,6 +27,15 @@ COLOR_GOOD = "#1d9e75"
 COLOR_BAD = "#d4534f"
 COLOR_NEUTRAL = "#5a8bb8"
 
+# One palette for score labels, shared by every chart that colors by Score_Label
+# so a BOGEY is the same red everywhere. Covers every label in LABEL_OFFSETS.
+SCORE_COLORS = {
+    "ACE": "#064a33", "EAGLE": "#0d6e4e", "BIRDIE": COLOR_GOOD, "PAR": COLOR_NEUTRAL,
+    "BOGEY": COLOR_BAD, "DOUBLE BOGEY": "#a3322f", "TRIPLE BOGEY": "#7a2622",
+    "QUADRUPLE BOGEY": "#521b18", "QUINTUPLE BOGEY": "#3b1311",
+    "SEXTUPLE BOGEY": "#290d0c",
+}
+
 
 # ─── Data loading ─────────────────────────────────────────────────────────────
 ROUNDS_PATH = "data/rounds_cleaned.csv"
@@ -50,6 +59,18 @@ def load_data(rounds_mtime: float, holes_mtime: float):
     unknown = set(holes["Score_Label"].unique()) - set(LABEL_OFFSETS) - {"ACE"}
     if unknown:
         st.error(f"Unknown Score_Label values in {HOLES_PATH}: {sorted(unknown)}")
+        st.stop()
+    # The course filter is built from the rounds table, so a hole row naming a course
+    # that isn't there would be dropped from every hole-level stat without a trace.
+    # That has happened before (a spreadsheet autofill incremented the course name),
+    # and the only symptom was a hole count quietly 8 short.
+    orphans = sorted(set(holes["Course_Name"]) - set(rounds["Course_Name"]))
+    if orphans:
+        st.error(
+            f"{HOLES_PATH} has hole rows for courses missing from {ROUNDS_PATH}: "
+            f"{orphans}. These would be silently excluded from every hole-level "
+            f"stat — fix the course names before trusting any number here."
+        )
         st.stop()
     holes["Score_vs_Par"] = holes["Score_Label"].map(LABEL_OFFSETS)
     is_ace = holes["Score_Label"] == "ACE"
@@ -125,7 +146,8 @@ c1.metric("Rounds", len(rounds_f))
 c2.metric("Holes played", len(holes_f))
 c3.metric("Avg score vs par", f"{rounds_f['Score_vs_Par'].mean():.1f}")
 c4.metric("Best round", int(rounds_f["Score_vs_Par"].min()))
-c5.metric("Birdie rate", f"{(holes_f['Score_vs_Par'] < 0).mean():.0%}")
+c5.metric("Under-par rate", f"{(holes_f['Score_vs_Par'] < 0).mean():.0%}",
+          help="Share of holes under par — birdies plus eagles and aces.")
 
 st.divider()
 
@@ -164,16 +186,10 @@ with tab1:
                  "DOUBLE BOGEY", "TRIPLE BOGEY", "QUADRUPLE BOGEY",
                  "QUINTUPLE BOGEY", "SEXTUPLE BOGEY"]
         dist = dist.reindex([o for o in order if o in dist.index])
-        color_map = {
-            "ACE": "#064a33", "EAGLE": "#0d6e4e", "BIRDIE": COLOR_GOOD, "PAR": COLOR_NEUTRAL,
-            "BOGEY": COLOR_BAD, "DOUBLE BOGEY": "#a3322f", "TRIPLE BOGEY": "#7a2622",
-            "QUADRUPLE BOGEY": "#521b18", "QUINTUPLE BOGEY": "#3b1311",
-            "SEXTUPLE BOGEY": "#290d0c",
-        }
         fig = px.bar(
             dist.reset_index(),
             x="Score_Label", y="proportion",
-            color="Score_Label", color_discrete_map=color_map,
+            color="Score_Label", color_discrete_map=SCORE_COLORS,
             text="proportion",
         )
         fig.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
@@ -204,12 +220,33 @@ with tab2:
     skill_cols = ["Fairway_Pct", "C1R_Pct", "C2R_Pct", "C1X_Pct", "OB_Pct"]
     available = [c for c in skill_cols if c in rounds_f.columns and rounds_f[c].notna().any()]
 
-    if len(rounds_f) >= 2 and available:
+    # With two rounds a correlation is +/-1 by construction regardless of the data,
+    # so ranking "strongest predictor" below this is meaningless, not merely noisy.
+    MIN_ROUNDS_FOR_CORR = 3
+
+    if len(rounds_f) < MIN_ROUNDS_FOR_CORR:
+        st.info(
+            f"Correlations need at least {MIN_ROUNDS_FOR_CORR} rounds to mean anything — "
+            f"this view has {len(rounds_f)}. With two rounds every correlation comes out "
+            f"as exactly +1 or −1 no matter what the numbers are. Widen the filters."
+        )
+    elif available:
         corrs = (
             rounds_f[available + ["Score_vs_Par"]]
             .corr()["Score_vs_Par"].drop("Score_vs_Par").sort_values()
         )
+        # A stat that never changes across the filtered rounds has no correlation at all.
+        # Leaving the NaNs in gives blank bars and makes idxmax return NaN, which then
+        # raises KeyError when used to look up a value.
+        undefined = sorted(corrs[corrs.isna()].index)
+        corrs = corrs.dropna()
 
+    if len(rounds_f) >= MIN_ROUNDS_FOR_CORR and available and corrs.empty:
+        st.info(
+            "None of the tracked stats vary across the rounds in this view, so no "
+            "correlation can be computed. Widen the filters to compare rounds that differ."
+        )
+    elif len(rounds_f) >= MIN_ROUNDS_FOR_CORR and available:
         col1, col2 = st.columns([3, 2])
         with col1:
             st.subheader("Stat correlations with round score")
@@ -231,23 +268,40 @@ with tab2:
                 "C1R_Pct": "Greens in regulation (C1R)",
                 "C2R_Pct": "Reaching Circle 2 (C2R)",
                 "C1X_Pct": "Putting from C1 (C1X)",
-                "OB_Pct": "Avoiding OB",
+                "OB_Pct": "OB rate",
             }
             strongest = corrs.abs().idxmax()
             weakest = corrs.abs().idxmin()
             sv = corrs[strongest]
             direction = "lower" if sv < 0 else "higher"
 
-            st.markdown(
-                f"**More negative correlation = stat improves my score.**\n\n"
+            if len(rounds_f) < 8:
+                caveat = (
+                    f"- ⚠️ With only **{len(rounds_f)} rounds** in this view, these correlations "
+                    f"are barely constrained by the data — one round can swing them from "
+                    f"strong to nothing. Read them as noise until the sample grows."
+                )
+            else:
+                caveat = (
+                    f"- ⚠️ With only **{len(rounds_f)} rounds** in this view, these correlations "
+                    f"are unstable — the strongest predictor has flipped between rounds before. "
+                    f"Treat this as a working hypothesis, not a conclusion."
+                )
+            lines = [
+                f"**More negative correlation = stat improves my score.**\n",
                 f"- **{stat_names.get(strongest, strongest)} is currently my strongest predictor** "
-                f"({sv:+.2f}). When this stat goes up, my score tends to be {direction}.\n"
+                f"({sv:+.2f}). When this stat goes up, my score tends to be {direction}.",
                 f"- **{stat_names.get(weakest, weakest)}** has the weakest relationship "
-                f"to my score right now.\n"
-                f"- ⚠️ With only **{len(rounds_f)} rounds** in this view, these correlations are "
-                f"unstable — the strongest predictor has flipped between rounds before. "
-                f"Treat this as a working hypothesis, not a conclusion."
-            )
+                f"to my score right now.",
+            ]
+            if undefined:
+                names = ", ".join(stat_names.get(u, u) for u in undefined)
+                lines.append(
+                    f"- **{names}** — no correlation shown: this stat is identical across "
+                    f"every round in view, so there is nothing to correlate against."
+                )
+            lines.append(caveat)
+            st.markdown("\n".join(lines))
 
     st.subheader("Hole-level impact: hitting C1R vs not")
     c1r_holes = holes_f.groupby("C1R")["Score_vs_Par"].agg(["mean", "count"]).round(2)
@@ -305,13 +359,16 @@ with tab3:
 
         with col1:
             st.subheader("Distance vs score")
+            # trendline_scope="overall" is essential here: without it plotly fits one OLS
+            # per color group, and Score_vs_Par is constant inside a Score_Label by
+            # definition (every BIRDIE is -1), so each fit collapses to a flat line.
             fig = px.scatter(
                 ph, x="Distance", y="Score_vs_Par",
                 color="Score_Label",
-                color_discrete_map={"ACE": "#064a33", "EAGLE": "#0d6e4e", "BIRDIE": COLOR_GOOD,
-                                    "PAR": COLOR_NEUTRAL, "BOGEY": COLOR_BAD},
+                color_discrete_map=SCORE_COLORS,
                 hover_data=["Course_Name", "Hole"],
-                trendline="ols", trendline_color_override="black",
+                trendline="ols", trendline_scope="overall",
+                trendline_color_override="black",
             )
             fig.add_hline(y=0, line_color="gray", line_dash="dash")
             fig.update_layout(
@@ -330,7 +387,7 @@ with tab3:
                 "Distance vs Fairway": ph["Distance"].corr(ph["Fairway_bin"]),
             }
             for k, v in dist_corrs.items():
-                st.metric(k, f"{v:+.3f}")
+                st.metric(k, "n/a" if pd.isna(v) else f"{v:+.3f}")
 
             def strength(v):
                 a = abs(v)
@@ -339,23 +396,28 @@ with tab3:
                 if a < 0.5: return "a moderate"
                 return "a strong"
 
-            s_score = dist_corrs["Distance vs Score"]
-            s_c1r = dist_corrs["Distance vs C1R"]
-            s_fwy = dist_corrs["Distance vs Fairway"]
+            def describe(label, v, up, down):
+                # A NaN correlation means one side never varied in this view. Falling
+                # through the strength() ladder would label it "a strong negative".
+                if pd.isna(v):
+                    return (f"- **{label} (n/a)** — not enough variation in this view "
+                            f"to compute a correlation.")
+                sign = "positive" if v > 0 else "negative"
+                return (f"- **{label} ({v:+.2f})** — {strength(v)} {sign} relationship: "
+                        f"{up if v > 0 else down}")
 
-            st.markdown(
-                f"**What these mean:**\n\n"
-                f"- **Distance vs Score ({s_score:+.2f})** — {strength(s_score)} "
-                f"{'positive' if s_score > 0 else 'negative'} relationship: longer holes tend to "
-                f"score {'worse (more strokes over par)' if s_score > 0 else 'better'}.\n"
-                f"- **Distance vs C1R ({s_c1r:+.2f})** — {strength(s_c1r)} "
-                f"{'positive' if s_c1r > 0 else 'negative'} relationship: as distance grows, "
-                f"my chance of reaching the green in regulation "
-                f"{'goes up' if s_c1r > 0 else 'drops'}.\n"
-                f"- **Distance vs Fairway ({s_fwy:+.2f})** — {strength(s_fwy)} "
-                f"{'positive' if s_fwy > 0 else 'negative'} relationship: longer drives are "
-                f"{'more' if s_fwy > 0 else 'less'} likely to stay in the fairway."
-            )
+            st.markdown("\n".join([
+                "**What these mean:**\n",
+                describe("Distance vs Score", dist_corrs["Distance vs Score"],
+                         "longer holes tend to score worse (more strokes over par).",
+                         "longer holes tend to score better."),
+                describe("Distance vs C1R", dist_corrs["Distance vs C1R"],
+                         "as distance grows, my chance of reaching the green in regulation goes up.",
+                         "as distance grows, my chance of reaching the green in regulation drops."),
+                describe("Distance vs Fairway", dist_corrs["Distance vs Fairway"],
+                         "longer drives are more likely to stay in the fairway.",
+                         "longer drives are less likely to stay in the fairway."),
+            ]))
 
         st.subheader("Performance by distance range")
         bins, labels = par_bins[par_choice]
@@ -364,7 +426,7 @@ with tab3:
             ph.groupby("dist_bin", observed=True)
             .agg(n=("Score_vs_Par", "count"),
                  Avg_score=("Score_vs_Par", "mean"),
-                 Birdie_rate=("Score_vs_Par", lambda x: (x < 0).mean()),
+                 Under_par_rate=("Score_vs_Par", lambda x: (x < 0).mean()),
                  C1R_rate=("C1R_bin", "mean"))
             .round(3).reset_index()
         )
@@ -443,7 +505,7 @@ with tab4:
                  Fairway_rate=("Fairway_bin", "mean"),
                  C1R_rate=("C1R_bin", "mean"),
                  OB_rate=("OB_bin", "mean"),
-                 Birdie_rate=("Score_vs_Par", lambda x: (x < 0).mean()))
+                 Under_par_rate=("Score_vs_Par", lambda x: (x < 0).mean()))
             .round(3).reset_index()
         )
 

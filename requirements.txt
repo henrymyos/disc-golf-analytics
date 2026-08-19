@@ -3,3 +3,4 @@ pandas>=2.0
 plotly>=5.18
 statsmodels>=0.14
 scikit-learn>=1.3
+numpy>=1.24
