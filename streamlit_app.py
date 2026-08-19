@@ -613,7 +613,8 @@ with tab5:
         st.markdown(
             "Set each skill level and see the model's predicted score. "
             "Sliders are clamped to the range the model has actually seen — "
-            "predictions outside that band would be pure extrapolation."
+            "predictions outside that band would be pure extrapolation. "
+            "C2R is also held at or above C1R, since C1 sits inside C2."
         )
         means = model_df[feats_available].mean()
         mins = model_df[feats_available].min()
@@ -634,6 +635,17 @@ with tab5:
                 value=default, step=0.01,
                 help=f"Observed range in current data: {mins[feat]:.0%} – {maxs[feat]:.0%}",
             )
+
+        # C1R is a subset of C2R -- a green hit inside 33 ft is also inside 66 ft --
+        # so C2R can never be below C1R. The sliders move independently, so clamp
+        # before the model ever sees an impossible round.
+        if {"C1R_Pct", "C2R_Pct"} <= set(what_if) and what_if["C2R_Pct"] < what_if["C1R_Pct"]:
+            st.warning(
+                f"C2R % can't be below C1R % — every green hit inside C1 is inside C2 too. "
+                f"Raising C2R from {what_if['C2R_Pct']:.0%} to {what_if['C1R_Pct']:.0%} "
+                f"for this prediction."
+            )
+            what_if["C2R_Pct"] = what_if["C1R_Pct"]
 
         x_new = np.array([[what_if[f] for f in feats_available]])
         pred_score = float(model.predict(x_new)[0])
