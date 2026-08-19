@@ -22,18 +22,29 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Color palette
-COLOR_GOOD = "#1d9e75"
-COLOR_BAD = "#d4534f"
-COLOR_NEUTRAL = "#5a8bb8"
+# Color palette. Streamlit follows the viewer's own light/dark theme, so every
+# colour here has to carry on both surfaces: each one clears 2.5:1 against the
+# dark surface (#1a1a19) and 2.7:1 against the light one (#fcfcfb), which pins
+# them to OKLCH lightness ~0.49-0.68. Chroma is held near 0.15-0.20 so they read
+# as colours rather than as tinted grey.
+COLOR_GOOD = "#149a63"     # green  — under par, hit the green
+COLOR_BAD = "#dc4526"      # red    — over par, missed
+COLOR_NEUTRAL = "#3f92e0"  # blue   — non-polar series (score trend, backhand)
+COLOR_ACCENT = "#cc6f19"   # orange — second categorical series (forehand, C1R rate)
+COLOR_MUTED = "#8e8e88"    # grey   — the neutral middle of the score scale
 
 # One palette for score labels, shared by every chart that colors by Score_Label
 # so a BOGEY is the same red everywhere. Covers every label in LABEL_OFFSETS.
+# This is a diverging scale: greens under par, a neutral grey at PAR, and reds
+# running to magenta as the hole gets worse. The old ramp drove the bad end
+# toward black (#290d0c sat at 1.04:1 on a dark background — invisible); each
+# step now separates by hue and chroma instead of by going darker.
 SCORE_COLORS = {
-    "ACE": "#064a33", "EAGLE": "#0d6e4e", "BIRDIE": COLOR_GOOD, "PAR": COLOR_NEUTRAL,
-    "BOGEY": COLOR_BAD, "DOUBLE BOGEY": "#a3322f", "TRIPLE BOGEY": "#7a2622",
-    "QUADRUPLE BOGEY": "#521b18", "QUINTUPLE BOGEY": "#3b1311",
-    "SEXTUPLE BOGEY": "#290d0c",
+    "ACE": "#00b08c", "EAGLE": "#00a179", "BIRDIE": COLOR_GOOD,
+    "PAR": COLOR_MUTED,
+    "BOGEY": COLOR_BAD, "DOUBLE BOGEY": "#c53019", "TRIPLE BOGEY": "#c02a3d",
+    "QUADRUPLE BOGEY": "#b32663", "QUINTUPLE BOGEY": "#a32484",
+    "SEXTUPLE BOGEY": "#9226a3",
 }
 
 
@@ -253,7 +264,7 @@ with tab2:
             fig = px.bar(
                 x=corrs.values, y=corrs.index, orientation="h",
                 color=corrs.values,
-                color_continuous_scale=[(0, COLOR_GOOD), (0.5, "lightgray"), (1, COLOR_BAD)],
+                color_continuous_scale=[(0, COLOR_GOOD), (0.5, COLOR_MUTED), (1, COLOR_BAD)],
                 color_continuous_midpoint=0,
                 labels={"x": "Correlation with Score_vs_Par", "y": ""},
             )
@@ -368,7 +379,7 @@ with tab3:
                 color_discrete_map=SCORE_COLORS,
                 hover_data=["Course_Name", "Hole"],
                 trendline="ols", trendline_scope="overall",
-                trendline_color_override="black",
+                trendline_color_override=COLOR_NEUTRAL,
             )
             fig.add_hline(y=0, line_color="gray", line_dash="dash")
             fig.update_layout(
@@ -442,8 +453,8 @@ with tab3:
             fig.add_scatter(x=binned["dist_bin"], y=binned["C1R_rate"],
                             name="C1R rate", yaxis="y2",
                             mode="lines+markers",
-                            line=dict(color="#ff7a1a", width=3),
-                            marker=dict(size=10, color="#ff7a1a"))
+                            line=dict(color=COLOR_ACCENT, width=3),
+                            marker=dict(size=10, color=COLOR_ACCENT))
 
             y_min = float(binned["Avg_score"].min())
             y_max = float(binned["Avg_score"].max())
@@ -490,7 +501,7 @@ with tab4:
         if "Shot_Type" in holes_f.columns:
             st.warning("No shot-type data with current filters.")
     else:
-        SHOT_COLORS = {"BH": COLOR_NEUTRAL, "FH": "#ff7a1a", "Other": "#888888"}
+        SHOT_COLORS = {"BH": COLOR_NEUTRAL, "FH": COLOR_ACCENT, "Other": COLOR_MUTED}
 
         st.subheader("Tee-shot mix")
         mix = st_holes["Shot_Type"].value_counts()
@@ -657,7 +668,7 @@ with tab5:
         fig = px.bar(
             coefs, x="Coefficient", y="Stat", orientation="h",
             color="Coefficient",
-            color_continuous_scale=[(0, COLOR_GOOD), (0.5, "lightgray"), (1, COLOR_BAD)],
+            color_continuous_scale=[(0, COLOR_GOOD), (0.5, COLOR_MUTED), (1, COLOR_BAD)],
             color_continuous_midpoint=0,
             text=coefs["Coefficient"].round(2),
         )
