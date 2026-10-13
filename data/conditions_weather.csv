@@ -1,0 +1,42 @@
+Date,Course_Name,Conditions,Temp_Max_F,Wind_Mph,Gust_Max_Mph,Rain_Mm
+2026-04-29,RM South,Perfect,87.4,4.6,19.2,0.0
+2026-05-02,Sweetwater,Slight wind,93.0,6.0,25.3,0.0
+2026-05-14,Bunker,Very windy,81.1,15.3,34.9,0.0
+2026-05-15,Bassett Creek,Slight wind,87.9,10.0,28.9,0.0
+2026-05-18,Bunker,Perfect,60.3,6.2,17.2,0.2
+2026-05-19,Bethel,Pretty windy,53.2,12.2,30.4,0.0
+2026-05-21,Ham Lake,Perfect,63.8,10.5,24.4,0.0
+2026-05-22,Bryant Lake,Slight rain,57.4,9.0,26.6,6.0
+2026-05-24,Ham Lake,Slight wind,78.7,7.2,19.0,0.0
+2026-05-26,Blue Ribbon Pines,Slight wind,84.7,3.7,14.1,0.0
+2026-05-27,Bryant Lake,Perfect,88.9,3.6,16.6,0.0
+2026-05-28,Bethel,Slight wind,84.7,7.0,20.6,0.0
+2026-05-29,Bryant Lake,Slight wind,87.5,6.8,20.8,0.0
+2026-05-30,Bethel,Pretty windy,83.7,11.9,31.3,0.0
+2026-06-09,Bunker,Slight wind,85.2,7.6,19.2,0.1
+2026-06-10,Blue Ribbon Pines,Pretty windy,82.1,10.6,26.6,3.3
+2026-06-12,Blue Ribbon Pines,Pretty windy,74.3,16.1,34.0,0.0
+2026-06-13,Blue Ribbon Pines,Really windy,70.2,14.5,31.5,0.0
+2026-06-14,Blue Ribbon Pines,Really windy,71.0,13.1,31.1,0.0
+2026-06-15,Bunker,Slight wind,77.8,11.0,28.0,0.0
+2026-06-28,Bunker,Perfect,79.3,14.2,32.2,0.6
+2026-06-30,Bunker,Perfect,87.9,12.9,28.6,0.0
+2026-07-05,Elm Creek,Hot,83.5,2.8,11.2,0.2
+2026-07-06,Blue Ribbon Pines,Hot,86.1,6.2,17.9,0.6
+2026-07-07,Bunker,Hot,80.3,2.2,10.1,0.4
+2026-07-08,Bethel,Hot,78.4,4.3,15.9,11.8
+2026-07-09,Blue Ribbon Pines,Hot,82.4,2.9,11.6,0.0
+2026-07-11,Blue Ribbon Pines,Hot,88.2,6.0,15.9,0.1
+2026-07-13,Kaposia,Hot,92.6,7.3,20.8,0.0
+2026-07-14,Bunker,Hot,95.0,7.6,19.2,0.0
+2026-07-15,Bethel,Hot,97.0,4.0,18.8,0.8
+2026-07-17,Kaposia,Hot,94.6,8.1,22.1,0.0
+2026-07-18,Bethel,Hot,89.1,7.5,22.8,0.0
+2026-07-19,Kaposia,Hot,86.6,6.5,23.0,0.0
+2026-07-20,Elm Creek,Hot,88.7,11.6,31.1,0.3
+2026-08-02,Bunker,Perfect,83.8,4.7,13.6,0.0
+2026-08-02,Pickard Park,Perfect,83.1,5.2,13.9,0.0
+2026-08-03,Pickard Park,Perfect,87.9,8.2,18.8,0.0
+2026-08-06,Bunker,Hot,82.7,8.3,19.9,0.0
+2026-08-11,Bunker,Hot,84.3,6.2,18.1,0.4
+2026-08-17,Bunker,Perfect,82.9,7.8,21.7,0.0

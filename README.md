@@ -49,6 +49,18 @@ Two related tables joined on `Date` + `Course_Name`:
 - **Score Model** — scikit-learn linear / ridge regression predicting round score from skill stats, with leave-one-out CV, coefficient inspection, and a what-if slider for simulating a round. Calls out the overfitting risk explicitly given the current sample size.
 - **Raw Data** — the underlying rounds and holes tables.
 
+## Adding rounds
+
+Tournament rounds come straight from PDGA Live, which records every hole's score and where each drive and approach finished:
+
+```bash
+python3 -m streamlit run tools/add_rounds.py   # or double-click add_rounds.command
+```
+
+Paste a PDGA event link and the page pulls each round you played: hole scores, pars and distances, fairway / C1R / C2R / OB per hole, and the round's C1X, C2 and scramble numbers. Conditions are suggested by matching the weather during the round (Open-Meteo) to the past rounds with the most similar weather and copying their label (`data/conditions_weather.csv`). Tap BH or FH for each tee shot (or copy them from the last time you played that layout), save, then **Push to the live dashboard**.
+
+A par-3 drive only counts as a fairway hit if it finishes inside C2.
+
 ## Running locally
 
 ```bash
