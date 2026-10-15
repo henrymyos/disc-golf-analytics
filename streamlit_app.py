@@ -201,7 +201,7 @@ holes_f = holes[holes["Round_ID"].isin(rounds_f["Round_ID"])]
 
 st.sidebar.divider()
 st.sidebar.markdown(
-    f"**Filtered data**\n\n{len(rounds_f)} round{'' if len(rounds_f) == 1 else 's'} · {len(holes_f)} holes"
+    f"**Filtered data**\n\n{len(rounds_f)} round{'' if len(rounds_f) == 1 else 's'} · {len(holes_f):,} holes"
 )
 st.sidebar.caption("The link in the address bar keeps these filters and the section, so you can share it.")
 st.sidebar.markdown(
@@ -259,14 +259,31 @@ if rounds_f.empty:
     st.stop()
 
 # ─── KPI row ──────────────────────────────────────────────────────────────────
-c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("Rounds", len(rounds_f))
-c2.metric("Holes played", len(holes_f))
-c3.metric(f"Avg score vs par{SCORE_SUFFIX}", f"{rounds_f[SCORE].mean():.1f}")
-best = rounds_f[SCORE].min()
-c4.metric(f"Best round{SCORE_SUFFIX}", f"{best:.1f}" if SCORE == PER_18 else int(best))
-c5.metric("Under-par rate", f"{(holes_f['Score_vs_Par'] < 0).mean():.0%}",
-          help="Share of holes under par — birdies plus eagles and aces.")
+# Streamlit stacks columns one per row under 640 px, which pushes the section picker
+# below the first phone screen. Keep the KPIs three to a row there instead.
+st.markdown("""
+<style>
+@media (max-width: 640px) {
+  .st-key-kpis [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; flex-direction: row !important;
+                                                   gap: 0.4rem 0.8rem !important; }
+  .st-key-kpis [data-testid="stColumn"] { flex: 1 1 calc(33% - 0.8rem) !important;
+                                          min-width: calc(33% - 0.8rem) !important; width: auto !important; }
+  .st-key-kpis [data-testid="stMetricValue"] { font-size: 1.5rem !important; }
+  .st-key-kpis [data-testid="stMetricLabel"] p { font-size: 0.75rem !important; }
+  .st-key-kpis [data-testid="stMetricLabel"], .st-key-kpis [data-testid="stMetricLabel"] * {
+    white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+}
+</style>
+""", unsafe_allow_html=True)
+with st.container(key="kpis"):
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Rounds", f"{len(rounds_f):,}")
+    c2.metric("Holes played", f"{len(holes_f):,}")
+    c3.metric(f"Avg score vs par{SCORE_SUFFIX}", f"{rounds_f[SCORE].mean():.1f}")
+    best = rounds_f[SCORE].min()
+    c4.metric(f"Best round{SCORE_SUFFIX}", f"{best:.1f}" if SCORE == PER_18 else int(best))
+    c5.metric("Under-par rate", f"{(holes_f['Score_vs_Par'] < 0).mean():.0%}",
+              help="Share of holes under par — birdies plus eagles and aces.")
 
 st.divider()
 
