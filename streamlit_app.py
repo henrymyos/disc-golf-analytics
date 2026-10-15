@@ -473,12 +473,13 @@ if view == "strokes":
         lines = []
         for _, r in valid.sort_values("Cost_per_18", ascending=False).iterrows():
             small = " (small sample, read loosely)" if min(r["Holes_when"], r["Holes_otherwise"]) < 10 else ""
-            n_txt = f"n = {int(r['Holes_when'])} of {int(r['Holes_when'] + r['Holes_otherwise'])} holes"
+            n_txt = f"n = {int(r['Holes_when']):,} of {int(r['Holes_when'] + r['Holes_otherwise']):,} holes"
             if r["Swing"] > 0:
                 lines.append(
-                    f"- **{r['Event']} costs about {r['Cost_per_18']:.1f} strokes a round.** It happens "
-                    f"{r['Per_18']:.1f} times per 18 holes, and those holes average {r['Swing']:.2f} strokes "
-                    f"worse than the rest ({n_txt}){small}."
+                    f"- **{r['Event']} costs about {r['Cost_per_18']:.1f} strokes a round** compared with "
+                    f"never doing it, which nobody manages. **Halving it saves about {r['Cost_per_18'] / 2:.1f}.** "
+                    f"It happens {r['Per_18']:.1f} times per 18 holes, and those holes average "
+                    f"{r['Swing']:.2f} strokes worse than the rest ({n_txt}){small}."
                 )
             else:
                 lines.append(
@@ -497,7 +498,7 @@ if view == "strokes":
         st.subheader("What if")
         w1, w2, w3 = st.columns([2, 2, 3])
         names = dict(zip(valid["Key"], valid["Event"]))
-        default_key = "OB" if "OB" in names else valid["Key"].iloc[0]
+        default_key = valid.sort_values("Cost_per_18", ascending=False)["Key"].iloc[0]  # biggest bar
         wf_key = w1.selectbox("Cut", list(names), index=list(names).index(default_key),
                               format_func=lambda k: {"OB": "OB", "C1R": "missed C1R", "C2R": "missed C2R",
                                                      "Fairway": "missed fairways"}[k], key="whatif_event")
@@ -686,10 +687,12 @@ if view == "drivers":
     if yes_n > 0 and no_n > 0:
         swing = (holes_f[holes_f["C1R"] == "NO"]["Score_vs_Par"].mean()
                  - holes_f[holes_f["C1R"] == "YES"]["Score_vs_Par"].mean())
+        # Same maths as "Where my strokes go": 10 points of C1R rate is 1.8 more greens per 18 holes.
+        extra_greens = 0.10 * 18
         st.info(
             f"**Per-hole swing:** {swing:.2f} strokes. "
-            f"If I improved my C1R rate by 10 percentage points (≈2 holes per round), "
-            f"I'd save roughly {swing * 2:.1f} strokes per round."
+            f"If I improved my C1R rate by 10 percentage points ({extra_greens:.1f} more greens per 18 holes), "
+            f"I'd save roughly {swing * extra_greens:.1f} strokes per round."
         )
 
 
