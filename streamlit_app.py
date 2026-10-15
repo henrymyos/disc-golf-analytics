@@ -14,7 +14,7 @@ from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import LeaveOneOut, cross_val_predict
 
-from analysis import HOLES_PATH, PER_18, RAW, ROUNDS_PATH, DataError, load_tables, stroke_costs
+from analysis import HOLES_PATH, PER_18, RAW, ROUNDS_PATH, DataError, hole_grid, load_tables, stroke_costs
 from scorecard import scorecard_html
 
 # ─── Page config ──────────────────────────────────────────────────────────────
@@ -134,8 +134,9 @@ c5.metric("Under-par rate", f"{(holes_f['Score_vs_Par'] < 0).mean():.0%}",
 st.divider()
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
-tab1, tab_strokes, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-    ["📈 Overview", "🧮 Where My Strokes Go", "🎯 What Drives My Score", "📏 Distance Analysis",
+tab1, tab_strokes, tab2, tab_courses, tab3, tab4, tab5, tab6 = st.tabs(
+    ["📈 Overview", "🧮 Where My Strokes Go", "🎯 What Drives My Score", "🗺️ Courses & Holes",
+     "📏 Distance Analysis",
      "🥏 Shot Type", "🤖 Score Model", "📋 Raw Data"]
 )
 
@@ -430,6 +431,112 @@ with tab2:
             f"**Per-hole swing:** {swing:.2f} strokes. "
             f"If I improved my C1R rate by 10 percentage points (≈2 holes per round), "
             f"I'd save roughly {swing * 2:.1f} strokes per round."
+        )
+
+
+# ─── Course and hole explorer ─────────────────────────────────────────────────
+# Diverging steps for score vs par, matching SCORE_COLORS: ace/albatross .. quad+.
+HEAT_STEPS = [(-3, SCORE_COLORS["ACE"]), (-2, SCORE_COLORS["EAGLE"]), (-1, SCORE_COLORS["BIRDIE"]),
+              (0, COLOR_MUTED), (1, SCORE_COLORS["BOGEY"]), (2, SCORE_COLORS["DOUBLE BOGEY"]),
+              (3, SCORE_COLORS["TRIPLE BOGEY"]), (4, SCORE_COLORS["QUADRUPLE BOGEY"])]
+
+
+def heat_colorscale():
+    lo, hi = HEAT_STEPS[0][0] - 0.5, HEAT_STEPS[-1][0] + 0.5
+    scale = []
+    for v, c in HEAT_STEPS:
+        scale += [((v - 0.5 - lo) / (hi - lo), c), ((v + 0.5 - lo) / (hi - lo), c)]
+    return scale, lo, hi
+
+
+def rel_text(v):
+    if pd.isna(v):
+        return ""
+    v = int(v)
+    return "E" if v == 0 else f"{v:+d}"
+
+
+with tab_courses:
+    st.markdown(
+        "Pick a course and a layout to see every hole across every round I've played it. "
+        "Cells show the score vs par (E = par), so the colour is never the only signal."
+    )
+    course_counts = rounds_f["Course_Name"].value_counts()
+    ccol, lcol = st.columns(2)
+    x_course = ccol.selectbox(
+        "Course", sorted(course_counts.index), key="explore_course",
+        format_func=lambda c: f"{c} ({course_counts[c]} round{'' if course_counts[c] == 1 else 's'})",
+    )
+    course_rounds = rounds_f[rounds_f["Course_Name"] == x_course]
+    layout_counts = course_rounds["Layout"].value_counts()
+    ALL = "All layouts"
+    layout_opts = ([ALL] if len(layout_counts) > 1 else []) + list(layout_counts.index)
+    if st.session_state.get("explore_layout") not in layout_opts:
+        st.session_state["explore_layout"] = layout_opts[0]
+    n_for = lambda l: len(course_rounds) if l == ALL else layout_counts[l]
+    x_layout = lcol.selectbox(
+        "Layout", layout_opts, key="explore_layout",
+        format_func=lambda l: f"{l} ({n_for(l)} round{'' if n_for(l) == 1 else 's'})",
+    )
+    sel_rounds = course_rounds if x_layout == ALL else course_rounds[course_rounds["Layout"] == x_layout]
+
+    if len(sel_rounds) == 1:
+        only = sel_rounds.iloc[0]
+        st.info("This layout has been played once, so here's that round's scorecard.")
+        st.markdown(
+            f"**{only['Round_Label']}** · **{int(only['Score_vs_Par']):+d}** "
+            f"({only['Score_per_18']:+.1f} per 18) · {only['Conditions']}"
+        )
+        st.markdown(scorecard_html(holes[holes["Round_ID"] == only["Round_ID"]], SCORE_COLORS),
+                    unsafe_allow_html=True)
+    else:
+        if x_layout == ALL:
+            st.caption("Different layouts can use different tees and pars, so rows line up by the order "
+                       "holes were played. Pick one layout for a like-for-like view.")
+        z, row_labels, per_hole = hole_grid(holes, sel_rounds)
+        col_labels = (sel_rounds.set_index("Round_ID").loc[z.columns]
+                      .apply(lambda r: r["Date"].strftime("%b ") + str(r["Date"].day)
+                             + (f" R{r.name.rsplit('_', 1)[-1]}" if r["Round_Label"].endswith(tuple(f"R{i}" for i in range(1, 10))) else ""),
+                             axis=1).tolist())
+        scale, zmin, zmax = heat_colorscale()
+        text = z.map(rel_text) if hasattr(z, "map") else z.applymap(rel_text)
+        fig = go.Figure(go.Heatmap(
+            z=z.clip(zmin + 0.5, zmax - 0.5).values, x=list(range(len(col_labels))), y=list(z.index),
+            text=text.values, texttemplate="%{text}", textfont=dict(color="white", size=12),
+            colorscale=scale, zmin=zmin, zmax=zmax, showscale=False, xgap=2, ygap=2,
+            customdata=[[rl] * len(col_labels) for rl in row_labels],
+            hovertemplate="Hole %{customdata} · %{x}<br>%{text} vs par<extra></extra>",
+        ))
+        fig.update_xaxes(tickvals=list(range(len(col_labels))), ticktext=col_labels, side="top",
+                         title_text="Round")
+        fig.update_yaxes(tickvals=list(z.index), ticktext=list(row_labels), autorange="reversed",
+                         title_text="Hole")
+        fig.update_layout(height=120 + 26 * len(z), margin=dict(l=10, r=10, t=60, b=10))
+        st.plotly_chart(fig, use_container_width=True)
+        if row_labels.str.endswith("†").any():
+            st.caption("† This hole label appears at more than one position in the round, so each gets its own "
+                       "row in the order played. What it is is a data question for Henry.")
+
+        tough = per_hole.sort_values(["Avg", "OB_rate"], ascending=False).head(3)
+        st.subheader("Toughest holes")
+        tcols = st.columns(len(tough))
+        for tc, (_, t) in zip(tcols, tough.iterrows()):
+            tc.metric(f"Hole {t['Hole']} · par {t['Par']} · {t['Distance']:.0f} ft", f"{t['Avg']:+.2f}",
+                      help=f"Average score vs par over {int(t['Rounds'])} rounds")
+            tc.caption(f"Birdie {t['Birdie_rate']:.0%} · bogey or worse {t['Bogey_rate']:.0%} · OB {t['OB_rate']:.0%}")
+
+        st.subheader("Every hole")
+        st.dataframe(
+            per_hole.drop(columns="Hole_Pos"), use_container_width=True, hide_index=True,
+            column_config={
+                "Hole": "Hole", "Par": "Par",
+                "Distance": st.column_config.NumberColumn("Distance (ft)", format="%d"),
+                "Rounds": "Rounds",
+                "Avg": st.column_config.NumberColumn("Avg vs par", format="%+.2f"),
+                "Birdie_rate": st.column_config.NumberColumn("Birdie rate", format="percent"),
+                "Bogey_rate": st.column_config.NumberColumn("Bogey+ rate", format="percent"),
+                "OB_rate": st.column_config.NumberColumn("OB rate", format="percent"),
+            },
         )
 
 

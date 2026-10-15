@@ -70,3 +70,12 @@ def test_stroke_costs_match_info_box(tables):
     assert (c["Holes_when"] + c["Holes_otherwise"] == len(holes)).all()
     ob = c.loc["OB"]
     assert abs(ob["Cost_per_18"] - ob["Swing"] * ob["Holes_when"] / len(holes) * 18) < 1e-12
+
+
+def test_hole_grid_keeps_both_fort_tuthill_18s(tables):
+    rounds, holes = tables
+    z, labels, per_hole = a.hole_grid(holes, rounds[rounds["Course_Name"] == "Fort Tuthill"])
+    assert z.shape == (20, 2)
+    assert list(labels).count("18†") == 2
+    q = rounds[rounds["Course_Name"] == "Quailwood"]
+    assert a.hole_grid(holes, q)[0].shape[1] == 3

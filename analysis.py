@@ -146,3 +146,33 @@ def stroke_costs(holes: pd.DataFrame) -> pd.DataFrame:
                      "Avg_when": avg_yes, "Avg_otherwise": avg_no, "Swing": swing,
                      "Rate": rate, "Per_18": rate * 18, "Cost_per_18": swing * rate * 18})
     return pd.DataFrame(rows)
+
+
+# ─── Course and hole explorer ─────────────────────────────────────────────────
+def hole_grid(holes: pd.DataFrame, rounds: pd.DataFrame):
+    """
+    Holes (rows, by Hole_Pos) x rounds (columns, in date order) of score vs par,
+    plus a per-hole summary. Row labels use the Hole label; a label that shows up
+    at more than one position gets a dagger so the two rows can't be mistaken
+    for one.
+    """
+    order = rounds.sort_values(["Date", "Round_ID"], kind="stable")["Round_ID"].tolist()
+    h = holes[holes["Round_ID"].isin(order)]
+    z = h.pivot(index="Hole_Pos", columns="Round_ID", values="Score_vs_Par").reindex(columns=order)
+    labels = (h.groupby("Hole_Pos")["Hole"].agg(lambda s: "/".join(dict.fromkeys(s.astype(str))))
+              .reindex(z.index))
+    dup = labels.duplicated(keep=False)
+    labels = labels.where(~dup, labels + "†")
+    summary = (
+        h.groupby("Hole_Pos")
+        .agg(Par=("Par", lambda s: "/".join(str(p) for p in sorted(set(s)))),
+             Distance=("Distance", "mean"),
+             Rounds=("Score_vs_Par", "size"),
+             Avg=("Score_vs_Par", "mean"),
+             Birdie_rate=("Score_vs_Par", lambda s: (s < 0).mean()),
+             Bogey_rate=("Score_vs_Par", lambda s: (s > 0).mean()),
+             OB_rate=("OB_bin", "mean"))
+        .reindex(z.index)
+    )
+    summary.insert(0, "Hole", labels)
+    return z, labels, summary.reset_index()
