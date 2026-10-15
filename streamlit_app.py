@@ -364,6 +364,18 @@ if view == "overview":
             f"**{int(rnd['Score_vs_Par']):+d}** ({rnd['Score_per_18']:+.1f} per 18) · {rnd['Conditions']}"
             + (f" · {rnd['Notes']}" if isinstance(rnd["Notes"], str) and rnd["Notes"].strip() else "")
         )
+        # Two rounds at one course on one day sit on top of each other on the trend, so a
+        # click can only land on one of them. Offer the other(s) right here.
+        siblings = rounds[(rounds["Date"] == rnd["Date"]) & (rounds["Course_Name"] == rnd["Course_Name"])
+                          & (rounds["Round_ID"] != rid) & rounds["Round_ID"].isin(round_opts)]
+        if len(siblings):
+            def _open_round(r):
+                st.session_state["round_pick"] = r
+            scols = st.columns(len(siblings) + 2)
+            scols[0].caption("Same course, same day:")
+            for sc, (_, sib) in zip(scols[1:], siblings.iterrows()):
+                sc.button(f"Open R{sib['Round_ID'].rsplit('_', 1)[-1]} ({int(sib['Score_vs_Par']):+d})",
+                          key=f"sib_{sib['Round_ID']}", on_click=_open_round, args=(sib["Round_ID"],))
         st.markdown(scorecard_html(rh, SCORE_COLORS), unsafe_allow_html=True)
 
         stat_rows = [("Score vs par (per 18)", "Score_per_18", "score"),
