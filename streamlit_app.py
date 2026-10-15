@@ -1239,9 +1239,11 @@ if view == "model":
         st.metric(
             f"Predicted round score vs par{SCORE_SUFFIX}",
             f"{pred_score:+.1f}",
-            delta="same as my average" if gap == 0 else f"{gap:+.1f} vs my average",
-            delta_color="off" if gap == 0 else "inverse",
+            delta=None if gap == 0 else f"{gap:+.1f} vs my average",
+            delta_color="inverse",
         )
+        if gap == 0:
+            st.caption("Same as my average.")
 
         st.info(
             f"⚠️ With only **{len(model_df)} rounds**, the LOO MAE of "
