@@ -115,3 +115,34 @@ def round_labels(rounds: pd.DataFrame) -> pd.Series:
     base = (rounds["Date"].dt.strftime("%b ") + rounds["Date"].dt.day.astype(str) + rounds["Date"].dt.strftime(", %Y")
             + " · " + rounds["Course_Name"] + " (" + rounds["Layout"] + ")")
     return base + n.where(doubles).map(lambda x: f" · R{x}" if isinstance(x, str) else "")
+
+
+# ─── Where my strokes go ──────────────────────────────────────────────────────
+# Each event is a hole-level flag. "Missed" events are the absence of a hit.
+STROKE_EVENTS = [
+    ("OB", "Going OB", "OB_bin", 1),
+    ("C1R", "Missing C1R", "C1R_bin", 0),
+    ("C2R", "Missing C2R", "C2R_bin", 0),
+    ("Fairway", "Missing the fairway", "Fairway_bin", 0),
+]
+
+
+def stroke_costs(holes: pd.DataFrame) -> pd.DataFrame:
+    """
+    Per event: how much worse holes go when it happens, and how often it happens.
+    cost per 18 = (avg hole score when it happened - avg when it didn't) x (rate x 18).
+    The events overlap (an OB hole usually misses C1R too), so the costs don't add up.
+    """
+    rows = []
+    total = len(holes)
+    for key, name, col, value in STROKE_EVENTS:
+        hit = holes[col] == value
+        n_yes, n_no = int(hit.sum()), int((~hit).sum())
+        avg_yes = holes.loc[hit, "Score_vs_Par"].mean() if n_yes else float("nan")
+        avg_no = holes.loc[~hit, "Score_vs_Par"].mean() if n_no else float("nan")
+        swing = avg_yes - avg_no
+        rate = n_yes / total if total else float("nan")
+        rows.append({"Key": key, "Event": name, "Holes_when": n_yes, "Holes_otherwise": n_no,
+                     "Avg_when": avg_yes, "Avg_otherwise": avg_no, "Swing": swing,
+                     "Rate": rate, "Per_18": rate * 18, "Cost_per_18": swing * rate * 18})
+    return pd.DataFrame(rows)

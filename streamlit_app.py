@@ -14,7 +14,7 @@ from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import LeaveOneOut, cross_val_predict
 
-from analysis import HOLES_PATH, PER_18, RAW, ROUNDS_PATH, DataError, load_tables
+from analysis import HOLES_PATH, PER_18, RAW, ROUNDS_PATH, DataError, load_tables, stroke_costs
 from scorecard import scorecard_html
 
 # ─── Page config ──────────────────────────────────────────────────────────────
@@ -134,8 +134,8 @@ c5.metric("Under-par rate", f"{(holes_f['Score_vs_Par'] < 0).mean():.0%}",
 st.divider()
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-    ["📈 Overview", "🎯 What Drives My Score", "📏 Distance Analysis",
+tab1, tab_strokes, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    ["📈 Overview", "🧮 Where My Strokes Go", "🎯 What Drives My Score", "📏 Distance Analysis",
      "🥏 Shot Type", "🤖 Score Model", "📋 Raw Data"]
 )
 
@@ -238,6 +238,79 @@ with tab1:
             for name, col, kind in stat_rows if col in rnd.index
         ])
         st.dataframe(compare, use_container_width=True, hide_index=True)
+
+
+# ─── Where my strokes go ──────────────────────────────────────────────────────
+with tab_strokes:
+    st.markdown(
+        "**Where do my strokes go?** For each mistake: how much worse a hole goes when it "
+        "happens, times how often it happens, scaled to an 18-hole round. That's the "
+        "strokes it costs me per round compared with never making that mistake."
+    )
+    costs = stroke_costs(holes_f)
+    valid = costs[costs["Holes_when"].gt(0) & costs["Holes_otherwise"].gt(0)]
+    if valid.empty:
+        st.info("Every hole in this view went the same way on every stat, so there's nothing to compare. "
+                "Widen the filters.")
+    else:
+        plot = valid.sort_values("Cost_per_18")
+        bar_text = [f"{c:.1f} strokes · n={w} of {w + o} holes"
+                    for c, w, o in zip(plot["Cost_per_18"], plot["Holes_when"], plot["Holes_otherwise"])]
+        fig = go.Figure(go.Bar(
+            x=plot["Cost_per_18"], y=plot["Event"], orientation="h",
+            marker_color=[COLOR_BAD if c > 0 else COLOR_GOOD for c in plot["Cost_per_18"]],
+            text=bar_text, textposition="auto",
+            customdata=plot[["Swing", "Per_18", "Holes_when", "Holes_otherwise"]].values,
+            hovertemplate=("<b>%{y}</b><br>Costs %{x:.2f} strokes per 18<br>"
+                           "%{customdata[0]:.2f} strokes worse per hole it happens<br>"
+                           "Happens %{customdata[1]:.1f} times per 18<br>"
+                           "n = %{customdata[2]} holes it happened, %{customdata[3]} it didn't<extra></extra>"),
+        ))
+        fig.add_vline(x=0, line_color="gray")
+        fig.update_layout(height=80 + 70 * len(plot), xaxis_title="Strokes per 18-hole round",
+                          yaxis_title="", margin=dict(l=10, r=10, t=10, b=40))
+        st.plotly_chart(fig, use_container_width=True)
+
+        lines = []
+        for _, r in valid.sort_values("Cost_per_18", ascending=False).iterrows():
+            small = " (small sample, read loosely)" if min(r["Holes_when"], r["Holes_otherwise"]) < 10 else ""
+            n_txt = f"n = {int(r['Holes_when'])} of {int(r['Holes_when'] + r['Holes_otherwise'])} holes"
+            if r["Swing"] > 0:
+                lines.append(
+                    f"- **{r['Event']} costs about {r['Cost_per_18']:.1f} strokes a round.** It happens "
+                    f"{r['Per_18']:.1f} times per 18 holes, and those holes average {r['Swing']:.2f} strokes "
+                    f"worse than the rest ({n_txt}){small}."
+                )
+            else:
+                lines.append(
+                    f"- **{r['Event']} hasn't cost me strokes in this view.** Those holes average "
+                    f"{abs(r['Swing']):.2f} strokes *better* than the rest ({n_txt}){small}."
+                )
+        for _, r in costs[~costs.index.isin(valid.index)].iterrows():
+            how = "every" if r["Holes_otherwise"] == 0 else "no"
+            lines.append(f"- **{r['Event']}:** happened on {how} hole in this view, so there's nothing to compare.")
+        st.markdown("\n".join(lines))
+        st.caption(
+            "These overlap and don't add up: an OB hole usually misses C1R and the fairway too, so the same "
+            "lost stroke shows up in more than one bar. Each bar answers \"what if only this one improved?\""
+        )
+
+        st.subheader("What if")
+        w1, w2, w3 = st.columns([2, 2, 3])
+        names = dict(zip(valid["Key"], valid["Event"]))
+        default_key = "OB" if "OB" in names else valid["Key"].iloc[0]
+        wf_key = w1.selectbox("Cut", list(names), index=list(names).index(default_key),
+                              format_func=lambda k: {"OB": "OB", "C1R": "missed C1R", "C2R": "missed C2R",
+                                                     "Fairway": "missed fairways"}[k], key="whatif_event")
+        cut = w2.slider("by %", min_value=0, max_value=100, value=50, step=5, key="whatif_cut")
+        row = valid.set_index("Key").loc[wf_key]
+        saved = max(row["Cost_per_18"], 0) * cut / 100
+        w3.metric("Strokes saved per 18", f"{saved:.1f}",
+                  help="Assumes each avoided mistake turns that hole into an average non-mistake hole.")
+        st.caption(
+            f"Cutting {names[wf_key].lower().replace('going ', '').replace('missing ', 'missed ')} by {cut}% means "
+            f"{row['Per_18'] * cut / 100:.1f} fewer per 18 holes, each worth about {row['Swing']:.2f} strokes."
+        )
 
 
 # ─── Tab 2: What Drives My Score ──────────────────────────────────────────────

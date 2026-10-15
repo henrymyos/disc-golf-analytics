@@ -59,3 +59,14 @@ def test_import_writes_ids():
     assert rnd["Round_ID"] == "2030-01-01_fort-tuthill_1"
     assert [h["Hole_Pos"] for h in holes] == [1, 2] and {h["Round_ID"] for h in holes} == {rnd["Round_ID"]}
     assert sum(ri.hole_score_vs_par(h) for h in holes) == rnd["Score_vs_Par"]
+
+
+def test_stroke_costs_match_info_box(tables):
+    _, holes = tables
+    c = a.stroke_costs(holes).set_index("Key")
+    swing = (holes.loc[holes["C1R"] == "NO", "Score_vs_Par"].mean()
+             - holes.loc[holes["C1R"] == "YES", "Score_vs_Par"].mean())
+    assert abs(c.loc["C1R", "Swing"] - swing) < 1e-12 and round(swing, 2) == 1.04
+    assert (c["Holes_when"] + c["Holes_otherwise"] == len(holes)).all()
+    ob = c.loc["OB"]
+    assert abs(ob["Cost_per_18"] - ob["Swing"] * ob["Holes_when"] / len(holes) * 18) < 1e-12
