@@ -291,6 +291,8 @@ if view == "overview":
             yaxis_title=f"Strokes vs par{SCORE_SUFFIX} (lower = better)",
             yaxis=dict(autorange="reversed"),
             clickmode="event+select",
+            # Two rounds on one day share an x; "closest" makes a click pick the point under the cursor.
+            hovermode="closest",
         )
         trend_event = st.plotly_chart(fig, width="stretch", key="trend",
                                       on_select="rerun", selection_mode="points")
@@ -448,9 +450,10 @@ if view == "strokes":
         saved = max(row["Cost_per_18"], 0) * cut / 100
         w3.metric("Strokes saved per 18", f"{saved:.1f}",
                   help="Assumes each avoided mistake turns that hole into an average non-mistake hole.")
+        noun = {"OB": "OB holes", "C1R": "missed C1Rs", "C2R": "missed C2Rs", "Fairway": "missed fairways"}[wf_key]
         st.caption(
-            f"Cutting {names[wf_key].lower().replace('going ', '').replace('missing ', 'missed ')} by {cut}% means "
-            f"{row['Per_18'] * cut / 100:.1f} fewer per 18 holes, each worth about {row['Swing']:.2f} strokes."
+            f"Cutting {noun} by {cut}% means {row['Per_18'] * cut / 100:.1f} fewer per 18 holes, "
+            f"each worth about {row['Swing']:.2f} strokes."
         )
 
 
