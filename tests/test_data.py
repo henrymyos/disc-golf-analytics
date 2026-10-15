@@ -79,3 +79,9 @@ def test_hole_grid_keeps_both_fort_tuthill_18s(tables):
     assert list(labels).count("18†") == 2
     q = rounds[rounds["Course_Name"] == "Quailwood"]
     assert a.hole_grid(holes, q)[0].shape[1] == 3
+
+
+def test_readme_summary_is_current():
+    import subprocess
+    r = subprocess.run([sys.executable, str(ROOT / "tools" / "summary.py"), "--check"], capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr

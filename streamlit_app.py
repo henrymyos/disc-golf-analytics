@@ -22,7 +22,7 @@ st.set_page_config(
     page_title="Disc Golf Analytics",
     page_icon="🥏",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 # Color palette. Streamlit follows the viewer's own light/dark theme, so every
@@ -48,6 +48,25 @@ SCORE_COLORS = {
     "BOGEY": COLOR_BAD, "DOUBLE BOGEY": "#c53019", "TRIPLE BOGEY": "#c02a3d",
     "QUADRUPLE BOGEY": "#b32663", "QUINTUPLE BOGEY": "#a32484",
     "SEXTUPLE BOGEY": "#9226a3",
+}
+
+
+# Human names for every column that reaches a chart axis, legend or table header.
+STAT_LABELS = {
+    "Fairway_Pct": "Fairway %", "C1R_Pct": "C1R %", "C2R_Pct": "C2R %",
+    "C1X_Pct": "C1X putting %", "C2_Pct": "C2 putting %", "Scramble_Pct": "Scramble %",
+    "OB_Pct": "OB rate",
+}
+PCT = lambda label, **kw: st.column_config.NumberColumn(label, format="percent", **kw)
+RAW_COLUMN_CONFIG = {
+    "Date": st.column_config.DateColumn("Date", format="YYYY-MM-DD"),
+    "Course_Name": "Course", "Layout": "Layout", "Holes": "Holes", "Course_Par": "Course par",
+    "Score_vs_Par": "Score vs par", "Score_per_18": st.column_config.NumberColumn("Score vs par (per 18)", format="%.1f"),
+    **{k: PCT(v) for k, v in STAT_LABELS.items()},
+    "Conditions": "Conditions", "Notes": "Notes", "Round_ID": "Round ID", "Round_Label": "Round",
+    "Hole": "Hole", "Hole_Pos": "Order played", "Par": "Par", "Distance": "Distance (ft)",
+    "Score_Label": "Score", "Shot_Type": "Tee shot", "Fairway": "Fairway", "C1R": "C1R", "C2R": "C2R",
+    "OB": "OB", "Strokes": "Strokes",
 }
 
 
@@ -273,7 +292,7 @@ if view == "overview":
             yaxis=dict(autorange="reversed"),
             clickmode="event+select",
         )
-        trend_event = st.plotly_chart(fig, use_container_width=True, key="trend",
+        trend_event = st.plotly_chart(fig, width="stretch", key="trend",
                                       on_select="rerun", selection_mode="points")
         st.caption("Click a point to open that round's scorecard below.")
         picked = tuple(p["customdata"][0] for p in trend_event.selection.points
@@ -294,23 +313,35 @@ if view == "overview":
             x="Score_Label", y="proportion",
             color="Score_Label", color_discrete_map=SCORE_COLORS,
             text="proportion",
+            labels={"Score_Label": "Score", "proportion": "% of holes"},
         )
         fig.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
         fig.update_layout(height=350, showlegend=False,
                           xaxis_title="", yaxis_title="% of holes")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     st.subheader("Performance by course")
     course_stats = (
         rounds_f.groupby("Course_Name")
         .agg(Rounds=(SCORE, "count"),
              Avg_score=(SCORE, "mean"),
+             Best=(SCORE, "min"),
              Avg_C1R=("C1R_Pct", "mean"),
              Avg_C1X=("C1X_Pct", "mean"),
-             Avg_Fairway=("Fairway_Pct", "mean"))
-        .round(2).reset_index().sort_values("Avg_score")
+             Avg_Fairway=("Fairway_Pct", "mean"),
+             Avg_OB=("OB_Pct", "mean"))
+        .reset_index().sort_values("Avg_score")
     )
-    st.dataframe(course_stats, use_container_width=True, hide_index=True)
+    st.dataframe(
+        course_stats, width="stretch", hide_index=True,
+        column_config={
+            "Course_Name": "Course", "Rounds": "Rounds",
+            "Avg_score": st.column_config.NumberColumn(f"Avg score{SCORE_SUFFIX}", format="%+.1f"),
+            "Best": st.column_config.NumberColumn(f"Best{SCORE_SUFFIX}", format="%+.1f"),
+            "Avg_C1R": PCT("C1R %"), "Avg_C1X": PCT("C1X putting %"),
+            "Avg_Fairway": PCT("Fairway %"), "Avg_OB": PCT("OB rate"),
+        },
+    )
 
 
     # ─── Scorecard ───────────────────────────────────────────────────────────
@@ -347,7 +378,7 @@ if view == "overview":
              "Difference": dfmt[kind](rnd[col] - rounds_f[col].mean())}
             for name, col, kind in stat_rows if col in rnd.index
         ])
-        st.dataframe(compare, use_container_width=True, hide_index=True)
+        st.dataframe(compare, width="stretch", hide_index=True)
 
 
 # ─── Where my strokes go ──────────────────────────────────────────────────────
@@ -379,7 +410,7 @@ if view == "strokes":
         fig.add_vline(x=0, line_color="gray")
         fig.update_layout(height=80 + 70 * len(plot), xaxis_title="Strokes per 18-hole round",
                           yaxis_title="", margin=dict(l=10, r=10, t=10, b=40))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         lines = []
         for _, r in valid.sort_values("Cost_per_18", ascending=False).iterrows():
@@ -464,15 +495,15 @@ if view == "drivers":
         with col1:
             st.subheader("Stat correlations with round score")
             fig = px.bar(
-                x=corrs.values, y=corrs.index, orientation="h",
+                x=corrs.values, y=[STAT_LABELS.get(c, c) for c in corrs.index], orientation="h",
                 color=corrs.values,
                 color_continuous_scale=[(0, COLOR_GOOD), (0.5, COLOR_MUTED), (1, COLOR_BAD)],
                 color_continuous_midpoint=0,
-                labels={"x": f"Correlation with score vs par{SCORE_SUFFIX}", "y": ""},
+                labels={"x": f"Correlation with score vs par{SCORE_SUFFIX}", "y": "", "color": "Correlation"},
             )
             fig.add_vline(x=0, line_color="gray")
             fig.update_layout(height=350, coloraxis_showscale=False)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         with col2:
             st.subheader("Interpretation")
@@ -525,11 +556,12 @@ if view == "drivers":
         c1r_holes, x="C1R", y="Avg score vs par",
         color="C1R", color_discrete_map={"YES": COLOR_GOOD, "NO": COLOR_BAD},
         text="Avg score vs par", hover_data=["Holes"],
+        labels={"C1R": "Hit C1R"},
     )
     fig.update_traces(texttemplate="%{text:.2f}", textposition="outside")
     fig.add_hline(y=0, line_color="gray")
     fig.update_layout(height=300, showlegend=False, xaxis_title="Hit green in regulation?")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     yes_n = (holes_f["C1R"] == "YES").sum()
     no_n = (holes_f["C1R"] == "NO").sum()
@@ -621,7 +653,7 @@ if view == "courses":
         fig.update_yaxes(tickvals=list(z.index), ticktext=list(row_labels), autorange="reversed",
                          title_text="Hole")
         fig.update_layout(height=120 + 26 * len(z), margin=dict(l=10, r=10, t=60, b=10))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
         if row_labels.str.endswith("†").any():
             st.caption("† This hole label appears at more than one position in the round, so each gets its own "
                        "row in the order played. What it is is a data question for Henry.")
@@ -636,7 +668,7 @@ if view == "courses":
 
         st.subheader("Every hole")
         st.dataframe(
-            per_hole.drop(columns="Hole_Pos"), use_container_width=True, hide_index=True,
+            per_hole.drop(columns="Hole_Pos"), width="stretch", hide_index=True,
             column_config={
                 "Hole": "Hole", "Par": "Par",
                 "Distance": st.column_config.NumberColumn("Distance (ft)", format="%d"),
@@ -681,11 +713,14 @@ if view == "distance":
             # trendline_scope="overall" is essential here: without it plotly fits one OLS
             # per color group, and Score_vs_Par is constant inside a Score_Label by
             # definition (every BIRDIE is -1), so each fit collapses to a flat line.
+            # Renamed columns, because the OLS trendline hover prints the raw column names.
             fig = px.scatter(
-                ph, x="Distance", y="Score_vs_Par",
-                color="Score_Label",
+                ph.rename(columns={"Score_vs_Par": "Score vs par", "Score_Label": "Score",
+                                   "Course_Name": "Course"}),
+                x="Distance", y="Score vs par",
+                color="Score",
                 color_discrete_map=SCORE_COLORS,
-                hover_data=["Course_Name", "Hole"],
+                hover_data=["Course", "Hole"],
                 trendline="ols", trendline_scope="overall",
                 trendline_color_override=COLOR_NEUTRAL,
             )
@@ -696,7 +731,7 @@ if view == "distance":
                 yaxis_title="Score vs par (lower = better)",
                 yaxis=dict(autorange="reversed"),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         with col2:
             st.subheader(f"Correlations (par {par_choice} only)")
@@ -778,10 +813,17 @@ if view == "distance":
                 xaxis_title="Distance range",
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         with col2:
-            st.dataframe(binned, use_container_width=True, hide_index=True)
+            st.dataframe(
+                binned, width="stretch", hide_index=True,
+                column_config={
+                    "dist_bin": "Distance", "n": "Holes",
+                    "Avg_score": st.column_config.NumberColumn("Avg vs par", format="%+.2f"),
+                    "Under_par_rate": PCT("Under par"), "C1R_rate": PCT("C1R rate"),
+                },
+            )
 
 
 # ─── Tab 4: Shot Type ─────────────────────────────────────────────────────────
@@ -849,9 +891,17 @@ if view == "shots":
                 height=350, showlegend=False,
                 yaxis=dict(title="Avg score vs par (lower = better)", range=y_range),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         with col2:
-            st.dataframe(agg, use_container_width=True, hide_index=True)
+            st.dataframe(
+                agg, width="stretch", hide_index=True,
+                column_config={
+                    "Shot_Type": "Tee shot", "Tee_shots": "Tee shots",
+                    "Avg_score": st.column_config.NumberColumn("Avg vs par", format="%+.2f"),
+                    "Fairway_rate": PCT("Fairway"), "C1R_rate": PCT("C1R"), "OB_rate": PCT("OB"),
+                    "Under_par_rate": PCT("Under par"),
+                },
+            )
 
         st.subheader("Fairway, C1R, OB rates by shot type")
         rates_long = agg.melt(
@@ -867,6 +917,7 @@ if view == "shots":
         fig = px.bar(
             rates_long, x="Metric", y="Rate", color="Shot_Type",
             color_discrete_map=SHOT_COLORS, barmode="group",
+            labels={"Shot_Type": "Tee shot", "Metric": "", "Rate": "Rate"},
             text=rates_long["Rate"].map(lambda v: f"{v:.0%}"),
         )
         fig.update_traces(textposition="outside")
@@ -874,7 +925,7 @@ if view == "shots":
             height=350, yaxis=dict(tickformat=".0%", title="Rate"),
             xaxis_title="",
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         st.subheader("Shot type by par class")
         par_breakdown = (
@@ -883,7 +934,11 @@ if view == "shots":
                  Avg_score=("Score_vs_Par", "mean"))
             .round(2).reset_index()
         )
-        st.dataframe(par_breakdown, use_container_width=True, hide_index=True)
+        st.dataframe(
+            par_breakdown, width="stretch", hide_index=True,
+            column_config={"Par": "Par", "Shot_Type": "Tee shot", "Holes": "Holes",
+                           "Avg_score": st.column_config.NumberColumn("Avg vs par", format="%+.2f")},
+        )
 
         # Dynamic interpretation
         if len(agg) >= 2 and {"BH", "FH"}.issubset(set(agg["Shot_Type"])):
@@ -968,11 +1023,11 @@ if view == "model":
                       line=dict(color="gray", dash="dash"))
         fig.update_traces(marker=dict(size=12, color=COLOR_NEUTRAL))
         fig.update_layout(height=380)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         st.subheader("Feature coefficients")
         coefs = pd.DataFrame({
-            "Stat": feats_available,
+            "Stat": [STAT_LABELS.get(f, f) for f in feats_available],
             "Coefficient": model.coef_,
         }).sort_values("Coefficient")
         coefs["Direction"] = coefs["Coefficient"].apply(
@@ -988,7 +1043,7 @@ if view == "model":
         fig.update_traces(textposition="outside")
         fig.add_vline(x=0, line_color="gray")
         fig.update_layout(height=300, coloraxis_showscale=False)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         st.caption(
             "Coefficients are on the raw 0–1 scale of each stat. A coefficient of −5 on a stat "
@@ -1017,7 +1072,7 @@ if view == "model":
             default = float(round(means[feat], 2))
             default = min(max(default, lo), hi)
             what_if[feat] = col.slider(
-                feat, min_value=lo, max_value=hi,
+                STAT_LABELS.get(feat, feat), min_value=lo, max_value=hi,
                 value=default, step=0.01,
                 help=f"Observed range in current data: {mins[feat]:.0%} – {maxs[feat]:.0%}",
             )
@@ -1052,6 +1107,8 @@ if view == "model":
 # ─── Tab 6: Raw data ──────────────────────────────────────────────────────────
 if view == "data":
     st.subheader("Rounds")
-    st.dataframe(rounds_f, use_container_width=True, hide_index=True)
+    st.dataframe(rounds_f.drop(columns=["Round_Label"]), width="stretch", hide_index=True,
+                 column_config=RAW_COLUMN_CONFIG)
     st.subheader("Holes")
-    st.dataframe(holes_f, use_container_width=True, hide_index=True)
+    st.dataframe(holes_f.drop(columns=[c for c in holes_f.columns if c.endswith("_bin")]),
+                 width="stretch", hide_index=True, column_config=RAW_COLUMN_CONFIG)
