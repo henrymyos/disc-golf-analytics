@@ -766,22 +766,45 @@ if view == "courses":
             z=z.clip(zmin + 0.5, zmax - 0.5).values, x=list(range(len(col_labels))), y=list(z.index),
             text=text.values, texttemplate="%{text}", textfont=dict(color="white", size=12),
             colorscale=scale, zmin=zmin, zmax=zmax, showscale=False, xgap=2, ygap=2,
-            customdata=[[rl] * len(col_labels) for rl in row_labels],
-            hovertemplate="Hole %{customdata} · %{x}<br>%{text} vs par<extra></extra>",
+            hoverinfo="skip",
         ))
+        # Plotly can't select heatmap cells, so an almost-invisible marker sits on every cell to
+        # carry the hover and make a click select that round.
+        cells = [(ci, pos, row_labels.loc[pos], col_labels[ci], text.iloc[ri, ci], rid)
+                 for ri, pos in enumerate(z.index) for ci, rid in enumerate(z.columns) if text.iloc[ri, ci]]
+        fig.add_scatter(
+            x=[c[0] for c in cells], y=[c[1] for c in cells], mode="markers",
+            marker=dict(size=22, symbol="square", color="rgba(0,0,0,0.01)"), showlegend=False,
+            customdata=[[c[5], c[2], c[3], c[4]] for c in cells],
+            hovertemplate="Hole %{customdata[1]} · %{customdata[2]}<br>%{customdata[3]} vs par<extra></extra>",
+        )
         fig.update_xaxes(tickvals=list(range(len(col_labels))), ticktext=col_labels, side="top",
                          title_text="Round")
         fig.update_yaxes(tickvals=list(z.index), ticktext=list(row_labels), autorange="reversed",
                          title_text="Hole")
-        fig.update_layout(height=120 + 26 * len(z), margin=dict(l=10, r=10, t=60, b=10))
-        st.plotly_chart(fig, width="stretch")
+        fig.update_layout(height=120 + 26 * len(z), margin=dict(l=10, r=10, t=60, b=10),
+                          clickmode="event+select")
+        heat_event = st.plotly_chart(fig, width="stretch", key=f"heat_{x_course}_{x_layout}",
+                                     on_select="rerun", selection_mode="points")
+        st.caption("Click any cell to open that round's scorecard.")
         if row_labels.str.endswith("†").any():
             st.caption("† This hole label appears at more than one position in the round, so each gets its own "
                        "row in the order played. What it is is a data question for Henry.")
+        heat_pts = [p for p in (heat_event.selection.points if heat_event else []) if p.get("customdata")]
+        if heat_pts:
+            hid = heat_pts[0]["customdata"][0]
+            if hid in set(z.columns):
+                hr = rounds.loc[rounds["Round_ID"] == hid].iloc[0]
+                st.markdown(f"**{hr['Round_Label']}** · **{int(hr['Score_vs_Par']):+d}** "
+                            f"({hr['Score_per_18']:+.1f} per 18) · {hr['Conditions']}")
+                st.markdown(scorecard_html(holes[holes["Round_ID"] == hid], SCORE_COLORS), unsafe_allow_html=True)
 
-        tough = per_hole.sort_values(["Avg", "OB_rate"], ascending=False).head(3)
+        # Only holes that average over par count as "tough".
+        tough = per_hole[per_hole["Avg"] > 0].sort_values(["Avg", "OB_rate"], ascending=False).head(3)
         st.subheader("Toughest holes")
-        tcols = st.columns(len(tough))
+        if tough.empty:
+            st.caption("No hole here averages over par.")
+        tcols = st.columns(max(len(tough), 1))
         for tc, (_, t) in zip(tcols, tough.iterrows()):
             tc.metric(f"Hole {t['Hole']} · par {t['Par']} · {t['Distance']:.0f} ft", f"{t['Avg']:+.2f}",
                       help=f"Average score vs par over {int(t['Rounds'])} rounds")
@@ -1212,11 +1235,12 @@ if view == "model":
 
         x_new = np.array([[what_if[f] for f in feats_available]])
         pred_score = float(model.predict(x_new)[0])
+        gap = round(pred_score - model_df[SCORE].mean(), 1)
         st.metric(
             f"Predicted round score vs par{SCORE_SUFFIX}",
             f"{pred_score:+.1f}",
-            delta=f"{pred_score - model_df[SCORE].mean():+.1f} vs my average",
-            delta_color="inverse",
+            delta="same as my average" if gap == 0 else f"{gap:+.1f} vs my average",
+            delta_color="off" if gap == 0 else "inverse",
         )
 
         st.info(
