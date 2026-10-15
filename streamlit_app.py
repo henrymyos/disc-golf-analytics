@@ -14,6 +14,8 @@ from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import LeaveOneOut, cross_val_predict
 
+from analysis import HOLES_PATH, PER_18, RAW, ROUNDS_PATH, DataError, load_tables
+
 # ─── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Disc Golf Analytics",
@@ -49,54 +51,19 @@ SCORE_COLORS = {
 
 
 # ─── Data loading ─────────────────────────────────────────────────────────────
-ROUNDS_PATH = "data/rounds_cleaned.csv"
-HOLES_PATH = "data/holes_cleaned.csv"
-
-
-# Score_vs_Par is derived from Score_Label + Par. ACE is absolute (1 stroke),
-# the rest are offsets from par. Labels cap at SEXTUPLE BOGEY; a worse hole
-# needs a new entry here.
-LABEL_OFFSETS = {
-    "EAGLE": -2, "BIRDIE": -1, "PAR": 0,
-    "BOGEY": 1, "DOUBLE BOGEY": 2, "TRIPLE BOGEY": 3, "QUADRUPLE BOGEY": 4,
-    "QUINTUPLE BOGEY": 5, "SEXTUPLE BOGEY": 6,
-}
-
-
 @st.cache_data
 def load_data(rounds_mtime: float, holes_mtime: float):
-    rounds = pd.read_csv(ROUNDS_PATH, parse_dates=["Date"])
-    holes = pd.read_csv(HOLES_PATH, parse_dates=["Date"])
-    unknown = set(holes["Score_Label"].unique()) - set(LABEL_OFFSETS) - {"ACE"}
-    if unknown:
-        st.error(f"Unknown Score_Label values in {HOLES_PATH}: {sorted(unknown)}")
-        st.stop()
-    # The course filter is built from the rounds table, so a hole row naming a course
-    # that isn't there would be dropped from every hole-level stat without a trace.
-    # That has happened before (a spreadsheet autofill incremented the course name),
-    # and the only symptom was a hole count quietly 8 short.
-    orphans = sorted(set(holes["Course_Name"]) - set(rounds["Course_Name"]))
-    if orphans:
-        st.error(
-            f"{HOLES_PATH} has hole rows for courses missing from {ROUNDS_PATH}: "
-            f"{orphans}. These would be silently excluded from every hole-level "
-            f"stat — fix the course names before trusting any number here."
-        )
-        st.stop()
-    holes["Score_vs_Par"] = holes["Score_Label"].map(LABEL_OFFSETS)
-    is_ace = holes["Score_Label"] == "ACE"
-    holes.loc[is_ace, "Score_vs_Par"] = 1 - holes.loc[is_ace, "Par"]
-    holes["Score_vs_Par"] = holes["Score_vs_Par"].astype(int)
-    holes["C1R_bin"] = (holes["C1R"] == "YES").astype(int)
-    holes["Fairway_bin"] = (holes["Fairway"] == "YES").astype(int)
-    holes["OB_bin"] = (holes["OB"] == "YES").astype(int)
-    return rounds, holes
+    return load_tables(ROUNDS_PATH, HOLES_PATH)
 
 
-rounds, holes = load_data(
-    os.path.getmtime(ROUNDS_PATH),
-    os.path.getmtime(HOLES_PATH),
-)
+try:
+    rounds, holes = load_data(
+        os.path.getmtime(ROUNDS_PATH),
+        os.path.getmtime(HOLES_PATH),
+    )
+except DataError as e:
+    st.error(str(e))
+    st.stop()
 
 # ─── Sidebar filters ──────────────────────────────────────────────────────────
 st.sidebar.title("Filters")
@@ -106,6 +73,16 @@ selected_courses = st.sidebar.multiselect(
     options=sorted(rounds["Course_Name"].unique()),
     default=sorted(rounds["Course_Name"].unique()),
 )
+
+score_mode = st.sidebar.radio(
+    "Score",
+    options=["per 18 holes", "raw"],
+    horizontal=True,
+    help="Rounds run from 9 to 30 holes, so by default every round score is scaled to "
+         "18 holes (score vs par × 18 ÷ holes). Raw shows the score as played.",
+)
+SCORE = PER_18 if score_mode == "per 18 holes" else RAW
+SCORE_SUFFIX = " (per 18)" if SCORE == PER_18 else " (raw)"
 
 min_date, max_date = rounds["Date"].min(), rounds["Date"].max()
 date_range = st.sidebar.date_input(
@@ -155,8 +132,9 @@ if rounds_f.empty:
 c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("Rounds", len(rounds_f))
 c2.metric("Holes played", len(holes_f))
-c3.metric("Avg score vs par", f"{rounds_f['Score_vs_Par'].mean():.1f}")
-c4.metric("Best round", int(rounds_f["Score_vs_Par"].min()))
+c3.metric(f"Avg score vs par{SCORE_SUFFIX}", f"{rounds_f[SCORE].mean():.1f}")
+best = rounds_f[SCORE].min()
+c4.metric(f"Best round{SCORE_SUFFIX}", f"{best:.1f}" if SCORE == PER_18 else int(best))
 c5.metric("Under-par rate", f"{(holes_f['Score_vs_Par'] < 0).mean():.0%}",
           help="Share of holes under par — birdies plus eagles and aces.")
 
@@ -176,16 +154,19 @@ with tab1:
         st.subheader("Score trend over time")
         fig = px.line(
             rounds_f.sort_values("Date"),
-            x="Date", y="Score_vs_Par",
+            x="Date", y=SCORE,
             markers=True,
-            hover_data=["Course_Name", "Layout", "Conditions"],
+            hover_data={"Course_Name": True, "Layout": True, "Holes": True,
+                        "Score_vs_Par": True, "Score_per_18": ":.1f", "Conditions": True},
+            labels={"Score_vs_Par": "Score vs par (raw)", "Score_per_18": "Score vs par (per 18)",
+                    "Course_Name": "Course"},
         )
         fig.add_hline(y=0, line_dash="dash", line_color="gray")
         fig.update_traces(line_color=COLOR_NEUTRAL, line_width=2,
                           marker=dict(size=10, color=COLOR_NEUTRAL))
         fig.update_layout(
             height=350,
-            yaxis_title="Strokes vs par (lower = better)",
+            yaxis_title=f"Strokes vs par{SCORE_SUFFIX} (lower = better)",
             yaxis=dict(autorange="reversed"),
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -211,8 +192,8 @@ with tab1:
     st.subheader("Performance by course")
     course_stats = (
         rounds_f.groupby("Course_Name")
-        .agg(Rounds=("Score_vs_Par", "count"),
-             Avg_score=("Score_vs_Par", "mean"),
+        .agg(Rounds=(SCORE, "count"),
+             Avg_score=(SCORE, "mean"),
              Avg_C1R=("C1R_Pct", "mean"),
              Avg_C1X=("C1X_Pct", "mean"),
              Avg_Fairway=("Fairway_Pct", "mean"))
@@ -243,8 +224,8 @@ with tab2:
         )
     elif available:
         corrs = (
-            rounds_f[available + ["Score_vs_Par"]]
-            .corr()["Score_vs_Par"].drop("Score_vs_Par").sort_values()
+            rounds_f[available + [SCORE]]
+            .corr()[SCORE].drop(SCORE).sort_values()
         )
         # A stat that never changes across the filtered rounds has no correlation at all.
         # Leaving the NaNs in gives blank bars and makes idxmax return NaN, which then
@@ -266,7 +247,7 @@ with tab2:
                 color=corrs.values,
                 color_continuous_scale=[(0, COLOR_GOOD), (0.5, COLOR_MUTED), (1, COLOR_BAD)],
                 color_continuous_midpoint=0,
-                labels={"x": "Correlation with Score_vs_Par", "y": ""},
+                labels={"x": f"Correlation with score vs par{SCORE_SUFFIX}", "y": ""},
             )
             fig.add_vline(x=0, line_color="gray")
             fig.update_layout(height=350, coloraxis_showscale=False)
@@ -596,14 +577,14 @@ with tab4:
 # ─── Tab 5: Score Model ───────────────────────────────────────────────────────
 with tab5:
     st.markdown(
-        "A simple linear model predicting **round score (vs par)** from skill stats. "
+        f"A simple linear model predicting **round score vs par{SCORE_SUFFIX}** from skill stats. "
         "Trained on every round in the current filters; honesty about the tiny sample is "
         "the point — predictions show a directional read, not an oracle."
     )
 
     feature_cols = ["Fairway_Pct", "C1R_Pct", "C2R_Pct", "C1X_Pct", "OB_Pct"]
     feats_available = [c for c in feature_cols if c in rounds_f.columns]
-    model_df = rounds_f.dropna(subset=feats_available + ["Score_vs_Par"])
+    model_df = rounds_f.dropna(subset=feats_available + [SCORE])
 
     if len(model_df) < 4:
         st.warning(
@@ -612,7 +593,7 @@ with tab5:
         )
     else:
         X = model_df[feats_available].values
-        y = model_df["Score_vs_Par"].values
+        y = model_df[SCORE].values
 
         model_choice = st.radio(
             "Model",
@@ -643,11 +624,16 @@ with tab5:
             "Round": model_df["Date"].dt.strftime("%Y-%m-%d") + " · " + model_df["Course_Name"],
             "Actual": y,
             "Predicted (LOO)": loo_preds,
+            "Raw": model_df["Score_vs_Par"].values,
+            "Per 18": model_df["Score_per_18"].values,
+            "Holes": model_df["Holes"].values,
         })
         fig = px.scatter(
             pred_df, x="Actual", y="Predicted (LOO)",
-            hover_data=["Round"],
-            labels={"Actual": "Actual score vs par", "Predicted (LOO)": "Predicted (LOO)"},
+            hover_data={"Round": True, "Holes": True, "Raw": True, "Per 18": ":.1f"},
+            labels={"Actual": f"Actual score vs par{SCORE_SUFFIX}",
+                    "Predicted (LOO)": f"Predicted (LOO){SCORE_SUFFIX}",
+                    "Raw": "Score vs par (raw)", "Per 18": "Score vs par (per 18)"},
         )
         lo = min(y.min(), loo_preds.min()) - 1
         hi = max(y.max(), loo_preds.max()) + 1
@@ -723,9 +709,9 @@ with tab5:
         x_new = np.array([[what_if[f] for f in feats_available]])
         pred_score = float(model.predict(x_new)[0])
         st.metric(
-            "Predicted round score vs par",
+            f"Predicted round score vs par{SCORE_SUFFIX}",
             f"{pred_score:+.1f}",
-            delta=f"{pred_score - model_df['Score_vs_Par'].mean():+.1f} vs my average",
+            delta=f"{pred_score - model_df[SCORE].mean():+.1f} vs my average",
             delta_color="inverse",
         )
 
