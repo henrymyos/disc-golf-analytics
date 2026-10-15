@@ -427,21 +427,26 @@ if view == "strokes":
                 "Widen the filters.")
     else:
         plot = valid.sort_values("Cost_per_18")
-        bar_text = [f"{c:.1f} strokes · n={w} of {w + o} holes"
-                    for c, w, o in zip(plot["Cost_per_18"], plot["Holes_when"], plot["Holes_otherwise"])]
+        # n lives in the axis label so it survives a 375-px screen; the bar only carries the number.
+        y_labels = [f"{e}<br><span style='font-size:11px'>{w:,}/{w + o:,} holes</span>"
+                    for e, w, o in zip(plot["Event"], plot["Holes_when"], plot["Holes_otherwise"])]
+        x_max = max(float(plot["Cost_per_18"].max()), 0.0)
+        x_min = min(float(plot["Cost_per_18"].min()), 0.0)
         fig = go.Figure(go.Bar(
-            x=plot["Cost_per_18"], y=plot["Event"], orientation="h",
+            x=plot["Cost_per_18"], y=y_labels, orientation="h",
             marker_color=[COLOR_BAD if c > 0 else COLOR_GOOD for c in plot["Cost_per_18"]],
-            text=bar_text, textposition="auto",
+            text=[f"{c:.1f}" for c in plot["Cost_per_18"]], textposition="outside", cliponaxis=False,
             customdata=plot[["Swing", "Per_18", "Holes_when", "Holes_otherwise"]].values,
-            hovertemplate=("<b>%{y}</b><br>Costs %{x:.2f} strokes per 18<br>"
+            hovertemplate=("Costs %{x:.2f} strokes per 18<br>"
                            "%{customdata[0]:.2f} strokes worse per hole it happens<br>"
                            "Happens %{customdata[1]:.1f} times per 18<br>"
                            "n = %{customdata[2]} holes it happened, %{customdata[3]} it didn't<extra></extra>"),
         ))
         fig.add_vline(x=0, line_color="gray")
+        span = (x_max - x_min) or 1.0
         fig.update_layout(height=80 + 70 * len(plot), xaxis_title="Strokes per 18-hole round",
-                          yaxis_title="", margin=dict(l=10, r=10, t=10, b=40))
+                          xaxis=dict(range=[x_min - (0.15 * span if x_min < 0 else 0), x_max + 0.15 * span]),
+                          yaxis=dict(title="", automargin=True), margin=dict(l=10, r=10, t=10, b=40))
         st.plotly_chart(fig, width="stretch")
 
         lines = []
