@@ -235,6 +235,14 @@ st.markdown(
     "Tracking what actually drives my score — and what doesn't."
 )
 
+active = [", ".join(x) for x in (selected_courses, selected_layouts, selected_conditions) if x]
+if only_18:
+    active.append("18-hole rounds only")
+if isinstance(date_range, tuple) and len(date_range) == 2 and (date_range[0] != MIN_DATE or date_range[1] != MAX_DATE):
+    active.append(f"{date_range[0]:%b %d} – {date_range[1]:%b %d}")
+if active:
+    st.caption("Filtered to: " + " · ".join(active) + " (open the sidebar to change)")
+
 if rounds_f.empty:
     sync_url()
     st.warning("No data matches the current filters. Adjust the sidebar to see results.")
