@@ -66,35 +66,105 @@ except DataError as e:
     st.error(str(e))
     st.stop()
 
-# ─── Sidebar filters ──────────────────────────────────────────────────────────
+# ─── Filters, section and URL state ───────────────────────────────────────────
+# Every filter and the section live in the URL (st.query_params), so a copied
+# link reopens the same view: ?course=Quailwood&conditions=Hot&view=strokes
+SECTIONS = {
+    "overview": "📈 Overview",
+    "strokes": "🧮 Where My Strokes Go",
+    "drivers": "🎯 What Drives My Score",
+    "courses": "🗺️ Courses & Holes",
+    "distance": "📏 Distance",
+    "shots": "🥏 Shot Type",
+    "model": "🤖 Score Model",
+    "data": "📋 Raw Data",
+}
+ALL_COURSES = sorted(rounds["Course_Name"].unique())
+ALL_CONDITIONS = sorted(rounds["Conditions"].dropna().unique(), key=str.lower)
+MIN_DATE, MAX_DATE = rounds["Date"].min().date(), rounds["Date"].max().date()
+
+
+def _match(values, options):
+    """URL values -> valid options: exact matches first, else case-insensitive ones."""
+    out = []
+    for v in values:
+        hits = [o for o in options if o == v] or [o for o in options if o.lower() == v.strip().lower()]
+        out += [h for h in hits if h not in out]
+    return out
+
+
+def _parse_date(v, fallback):
+    if not v:
+        return fallback
+    try:
+        d = pd.to_datetime(v).date()
+        return min(max(d, MIN_DATE), MAX_DATE)
+    except (TypeError, ValueError):
+        return fallback
+
+
+if "_url_loaded" not in st.session_state:
+    qp = st.query_params
+    st.session_state["f_course"] = _match(qp.get_all("course"), ALL_COURSES)
+    st.session_state["_url_layout"] = qp.get_all("layout")
+    st.session_state["f_conditions"] = _match(qp.get_all("conditions"), ALL_CONDITIONS)
+    st.session_state["f_18"] = qp.get("holes") == "18"
+    st.session_state["f_score"] = "raw" if qp.get("score") == "raw" else "per 18 holes"
+    st.session_state["f_dates"] = (_parse_date(qp.get("from"), MIN_DATE), _parse_date(qp.get("to"), MAX_DATE))
+    st.session_state["view"] = qp.get("view") if qp.get("view") in SECTIONS else "overview"
+    if qp.get("round") in set(rounds["Round_ID"]):
+        st.session_state["round_pick"] = qp.get("round")
+    st.session_state["_url_loaded"] = True
+
 st.sidebar.title("Filters")
 
 selected_courses = st.sidebar.multiselect(
-    "Course",
-    options=sorted(rounds["Course_Name"].unique()),
-    default=sorted(rounds["Course_Name"].unique()),
+    "Course", options=ALL_COURSES, key="f_course", placeholder="All courses",
+    help="Leave empty for all courses.",
 )
+course_rounds_pool = rounds[rounds["Course_Name"].isin(selected_courses)] if selected_courses else rounds
+layout_courses = course_rounds_pool.groupby("Layout")["Course_Name"].agg(lambda c: sorted(set(c)))
+layout_opts = sorted(layout_courses.index, key=str.lower)
+if "_url_layout" in st.session_state:
+    st.session_state["f_layout"] = _match(st.session_state.pop("_url_layout"), layout_opts)
+st.session_state["f_layout"] = [l for l in st.session_state.get("f_layout", []) if l in layout_opts]
 
+
+def _layout_label(l):
+    cs = layout_courses[l]
+    return l if len(selected_courses) == 1 else f"{l} · {', '.join(cs[:2])}{' …' if len(cs) > 2 else ''}"
+
+
+selected_layouts = st.sidebar.multiselect(
+    "Layout", options=layout_opts, key="f_layout", placeholder="All layouts",
+    format_func=_layout_label,
+)
+selected_conditions = st.sidebar.multiselect(
+    "Conditions", options=ALL_CONDITIONS, key="f_conditions", placeholder="Any conditions",
+)
+only_18 = st.sidebar.checkbox("18-hole rounds only", key="f_18")
+date_range = st.sidebar.date_input(
+    "Date range", key="f_dates", min_value=MIN_DATE, max_value=MAX_DATE,
+)
 score_mode = st.sidebar.radio(
     "Score",
     options=["per 18 holes", "raw"],
     horizontal=True,
+    key="f_score",
     help="Rounds run from 9 to 30 holes, so by default every round score is scaled to "
          "18 holes (score vs par × 18 ÷ holes). Raw shows the score as played.",
 )
 SCORE = PER_18 if score_mode == "per 18 holes" else RAW
 SCORE_SUFFIX = " (per 18)" if SCORE == PER_18 else " (raw)"
 
-min_date, max_date = rounds["Date"].min(), rounds["Date"].max()
-date_range = st.sidebar.date_input(
-    "Date range",
-    value=(min_date, max_date),
-    min_value=min_date,
-    max_value=max_date,
-)
-
 # Apply filters. Filters pick rounds; holes follow their round via Round_ID.
-rounds_f = rounds[rounds["Course_Name"].isin(selected_courses)]
+rounds_f = course_rounds_pool
+if selected_layouts:
+    rounds_f = rounds_f[rounds_f["Layout"].isin(selected_layouts)]
+if selected_conditions:
+    rounds_f = rounds_f[rounds_f["Conditions"].isin(selected_conditions)]
+if only_18:
+    rounds_f = rounds_f[rounds_f["Holes"] == 18]
 if isinstance(date_range, tuple) and len(date_range) == 2:
     start, end = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])
     rounds_f = rounds_f[(rounds_f["Date"] >= start) & (rounds_f["Date"] <= end)]
@@ -102,12 +172,41 @@ holes_f = holes[holes["Round_ID"].isin(rounds_f["Round_ID"])]
 
 st.sidebar.divider()
 st.sidebar.markdown(
-    f"**Filtered data**\n\n{len(rounds_f)} rounds · {len(holes_f)} holes"
+    f"**Filtered data**\n\n{len(rounds_f)} round{'' if len(rounds_f) == 1 else 's'} · {len(holes_f)} holes"
 )
+st.sidebar.caption("The link in the address bar keeps these filters and the section, so you can share it.")
 st.sidebar.markdown(
     "Built by Henry · "
     "[GitHub](https://github.com/henrymyos/disc-golf-analytics)"
 )
+
+
+def sync_url(round_id=None):
+    params = {}
+    if selected_courses:
+        params["course"] = selected_courses
+    if selected_layouts:
+        params["layout"] = selected_layouts
+    if selected_conditions:
+        params["conditions"] = selected_conditions
+    if only_18:
+        params["holes"] = "18"
+    if SCORE == RAW:
+        params["score"] = "raw"
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        if date_range[0] != MIN_DATE:
+            params["from"] = date_range[0].isoformat()
+        if date_range[1] != MAX_DATE:
+            params["to"] = date_range[1].isoformat()
+    view_now = st.session_state.get("view") or "overview"
+    if view_now != "overview":
+        params["view"] = view_now
+    if round_id:
+        params["round"] = round_id
+    want = {k: (v if isinstance(v, list) else [v]) for k, v in params.items()}
+    have = {k: st.query_params.get_all(k) for k in st.query_params.keys()}
+    if want != have:
+        st.query_params.from_dict(params)
 
 
 # ─── Header ───────────────────────────────────────────────────────────────────
@@ -118,6 +217,7 @@ st.markdown(
 )
 
 if rounds_f.empty:
+    sync_url()
     st.warning("No data matches the current filters. Adjust the sidebar to see results.")
     st.stop()
 
@@ -133,15 +233,23 @@ c5.metric("Under-par rate", f"{(holes_f['Score_vs_Par'] < 0).mean():.0%}",
 
 st.divider()
 
-# ─── Tabs ─────────────────────────────────────────────────────────────────────
-tab1, tab_strokes, tab2, tab_courses, tab3, tab4, tab5, tab6 = st.tabs(
-    ["📈 Overview", "🧮 Where My Strokes Go", "🎯 What Drives My Score", "🗺️ Courses & Holes",
-     "📏 Distance Analysis",
-     "🥏 Shot Type", "🤖 Score Model", "📋 Raw Data"]
-)
+# ─── Section picker ───────────────────────────────────────────────────────────
+def _keep_view():
+    # Clicking the active segment would deselect it; stay on the section instead.
+    if st.session_state.get("view") is None:
+        st.session_state["view"] = st.session_state.get("_last_view", "overview")
+    st.session_state["_last_view"] = st.session_state["view"]
+
+
+view = st.segmented_control(
+    "Section", options=list(SECTIONS), format_func=SECTIONS.get, key="view",
+    on_change=_keep_view, label_visibility="collapsed",
+) or "overview"
+sync_url(st.session_state.get("round_pick") if view == "overview" else None)
+st.write("")
 
 # ─── Tab 1: Overview ──────────────────────────────────────────────────────────
-with tab1:
+if view == "overview":
     col1, col2 = st.columns([3, 2])
 
     with col1:
@@ -214,6 +322,7 @@ with tab1:
     rid = st.selectbox("Round", round_opts, key="round_pick", index=None,
                        format_func=lambda r: labels.get(r, r),
                        placeholder="Pick a round, or click a point on the trend")
+    sync_url(rid)
     if rid:
         rnd = rounds.loc[rounds["Round_ID"] == rid].iloc[0]
         rh = holes[holes["Round_ID"] == rid]
@@ -242,7 +351,7 @@ with tab1:
 
 
 # ─── Where my strokes go ──────────────────────────────────────────────────────
-with tab_strokes:
+if view == "strokes":
     st.markdown(
         "**Where do my strokes go?** For each mistake: how much worse a hole goes when it "
         "happens, times how often it happens, scaled to an 18-hole round. That's the "
@@ -315,7 +424,7 @@ with tab_strokes:
 
 
 # ─── Tab 2: What Drives My Score ──────────────────────────────────────────────
-with tab2:
+if view == "drivers":
     st.markdown(
         "**The big question:** of all my tracked stats, which ones actually correlate "
         "with shooting a low score?"
@@ -456,7 +565,7 @@ def rel_text(v):
     return "E" if v == 0 else f"{v:+d}"
 
 
-with tab_courses:
+if view == "courses":
     st.markdown(
         "Pick a course and a layout to see every hole across every round I've played it. "
         "Cells show the score vs par (E = par), so the colour is never the only signal."
@@ -541,7 +650,7 @@ with tab_courses:
 
 
 # ─── Tab 3: Distance Analysis ─────────────────────────────────────────────────
-with tab3:
+if view == "distance":
     st.markdown(
         "Distance distributions differ by par, so analysis is split by par class."
     )
@@ -676,7 +785,7 @@ with tab3:
 
 
 # ─── Tab 4: Shot Type ─────────────────────────────────────────────────────────
-with tab4:
+if view == "shots":
     st.markdown(
         "**Tee-shot type only** (BH / FH / Other). Approach shots aren't tagged. "
         "Useful for asking: which shot type actually keeps me in play and out of trouble?"
@@ -793,7 +902,7 @@ with tab4:
 
 
 # ─── Tab 5: Score Model ───────────────────────────────────────────────────────
-with tab5:
+if view == "model":
     st.markdown(
         f"A simple linear model predicting **round score vs par{SCORE_SUFFIX}** from skill stats. "
         "Trained on every round in the current filters; honesty about the tiny sample is "
@@ -941,7 +1050,7 @@ with tab5:
 
 
 # ─── Tab 6: Raw data ──────────────────────────────────────────────────────────
-with tab6:
+if view == "data":
     st.subheader("Rounds")
     st.dataframe(rounds_f, use_container_width=True, hide_index=True)
     st.subheader("Holes")
