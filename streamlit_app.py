@@ -14,7 +14,7 @@ from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import LeaveOneOut, cross_val_predict
 
-from analysis import HOLES_PATH, PER_18, RAW, ROUNDS_PATH, DataError, hole_grid, load_tables, stroke_costs
+from analysis import HOLES_PATH, bootstrap_band, correlation_history, PER_18, RAW, ROUNDS_PATH, DataError, hole_grid, load_tables, stroke_costs
 from scorecard import scorecard_html
 
 # ─── Page config ──────────────────────────────────────────────────────────────
@@ -546,6 +546,66 @@ if view == "drivers":
                 )
             lines.append(caveat)
             st.markdown("\n".join(lines))
+
+    # ─── How sure are we? ────────────────────────────────────────────────────
+    st.subheader("How sure are we? Correlations as rounds added up")
+    MIN_ROUNDS_FOR_HISTORY = 8
+    hist_stats = [c for c in ["Fairway_Pct", "C1R_Pct", "C2R_Pct", "C1X_Pct", "OB_Pct"] if c in rounds_f.columns]
+    if len(rounds_f) < MIN_ROUNDS_FOR_HISTORY:
+        st.info(f"The history starts at {MIN_ROUNDS_FOR_HISTORY} rounds; this view has {len(rounds_f)}. "
+                f"Widen the filters to see how the correlations moved.")
+    else:
+        @st.cache_data
+        def _history(ids: tuple, score: str):
+            sub = rounds[rounds["Round_ID"].isin(ids)]
+            return (correlation_history(sub, score, hist_stats, MIN_ROUNDS_FOR_HISTORY),
+                    bootstrap_band(sub, score, hist_stats))
+
+        hist, band = _history(tuple(sorted(rounds_f["Round_ID"])), SCORE)
+        HIST_COLORS = {"Fairway_Pct": COLOR_NEUTRAL, "C1R_Pct": COLOR_GOOD, "C2R_Pct": "#a35bd6",
+                       "C1X_Pct": COLOR_ACCENT, "OB_Pct": COLOR_BAD}
+        HIST_DASH = {"Fairway_Pct": "solid", "C1R_Pct": "solid", "C2R_Pct": "dash",
+                     "C1X_Pct": "dot", "OB_Pct": "dashdot"}
+        n_total = int(hist["Round_number"].max())
+        fig = go.Figure()
+        for stat in hist_stats:
+            d = hist[hist["Stat"] == stat]
+            name = STAT_LABELS.get(stat, stat)
+            fig.add_scatter(
+                x=d["Round_number"], y=d["Correlation"], mode="lines", name=name,
+                line=dict(color=HIST_COLORS[stat], width=2.5, dash=HIST_DASH[stat]),
+                customdata=d[["Round_Label"]].values,
+                hovertemplate=f"<b>{name}</b> %{{y:+.2f}}<br>After %{{x}} rounds<br>%{{customdata[0]}}<extra></extra>",
+            )
+            b = band[band["Stat"] == stat].iloc[0]
+            fig.add_scatter(
+                x=[n_total], y=[b["Correlation"]], mode="markers+text", showlegend=False,
+                marker=dict(color=HIST_COLORS[stat], size=9),
+                error_y=dict(type="data", symmetric=False, array=[b["High"] - b["Correlation"]],
+                             arrayminus=[b["Correlation"] - b["Low"]], color=HIST_COLORS[stat], thickness=2, width=6),
+                text=[f" {name}"], textposition="middle right", textfont=dict(color=HIST_COLORS[stat]),
+                hovertemplate=(f"<b>{name}</b> now %{{y:+.2f}}<br>80% band {b['Low']:+.2f} to {b['High']:+.2f}"
+                               "<extra></extra>"),
+            )
+        fig.add_hline(y=0, line_color="gray")
+        fig.update_layout(
+            height=420, xaxis_title="Rounds played (in date order)",
+            yaxis_title=f"Correlation with score{SCORE_SUFFIX}", yaxis=dict(range=[-1.05, 1.05]),
+            xaxis=dict(range=[MIN_ROUNDS_FOR_HISTORY - 1, n_total + max(4, n_total * 0.18)]),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+            margin=dict(l=10, r=10, t=40, b=40),
+        )
+        st.plotly_chart(fig, width="stretch")
+        band_txt = "; ".join(
+            f"{STAT_LABELS.get(r['Stat'], r['Stat'])} {r['Correlation']:+.2f} ({r['Low']:+.2f} to {r['High']:+.2f})"
+            for _, r in band.reindex(band["Correlation"].abs().sort_values(ascending=False).index).iterrows()
+        )
+        st.caption(
+            f"Each line is that stat's correlation with score over the first N rounds of this view, starting at "
+            f"{MIN_ROUNDS_FOR_HISTORY}. The bars on the right are 80% bootstrap bands for today's values "
+            f"(resampling whole rounds 2,000 times): {band_txt}. Overlapping bands mean the ranking between "
+            f"those stats isn't settled yet."
+        )
 
     st.subheader("Hole-level impact: hitting C1R vs not")
     c1r_holes = holes_f.groupby("C1R")["Score_vs_Par"].agg(["mean", "count"]).round(2)

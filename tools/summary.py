@@ -56,6 +56,21 @@ def summary() -> str:
     order = corr.abs().sort_values(ascending=False).index
     corr_txt = ", ".join(f"{STAT_NAMES[c]} {corr[c]:+.2f}" for c in order)
 
+    hist = a.correlation_history(rounds, a.PER_18, cols, 8)
+    checkpoints = sorted({8, (8 + len(rounds)) // 2, len(rounds)})
+    parts = []
+    for k in checkpoints:
+        h = hist[hist["Round_number"] == k].set_index("Stat")["Correlation"]
+        lead = h.abs().idxmax()
+        parts.append(f"after {k} rounds the strongest was {STAT_NAMES[lead]} ({h[lead]:+.2f}), "
+                     f"fairway % sat at {h['Fairway_Pct']:+.2f}")
+    history_txt = "; ".join(parts)
+    band = a.bootstrap_band(rounds, a.PER_18, cols).set_index("Stat")
+    top2 = list(order[:2])
+    overlap = band.loc[top2[0], "Low"] <= band.loc[top2[1], "High"] and band.loc[top2[1], "Low"] <= band.loc[top2[0], "High"]
+    history_txt += (f". The 80% bootstrap bands for {STAT_NAMES[top2[0]]} and {STAT_NAMES[top2[1]]} "
+                    f"{'overlap, so the top spot is not settled' if overlap else 'do not overlap'}")
+
     costs = a.stroke_costs(holes).set_index("Key")
     c1r = costs.loc["C1R"]
     top = costs.sort_values("Cost_per_18", ascending=False)
@@ -83,7 +98,7 @@ def summary() -> str:
         f"Worst hole on record: a {worst['Score_Label'].lower()}, {int(worst['Strokes'])} on a "
         f"{int(worst['Distance'])}-ft par {int(worst['Par'])} ({worst['Course_Name']}, {_date(worst['Date'])}).",
         f"- **Round-level correlations with score per 18,** strongest first: {corr_txt}. "
-        f"Small samples, so these move as rounds are added.",
+        f"Small samples, so these move as rounds are added: {history_txt}.",
         f"- **Where the strokes go** (cost per 18 versus never making that mistake; these overlap): {cost_txt} strokes.",
         f"- **Missing the green costs about a full stroke:** holes where I miss C1R average "
         f"{c1r['Swing']:.2f} strokes worse than holes where I hit it.",

@@ -4,6 +4,7 @@ README summary script and the tests can use exactly the same numbers.
 """
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 ROUNDS_PATH = "data/rounds_cleaned.csv"
@@ -176,3 +177,49 @@ def hole_grid(holes: pd.DataFrame, rounds: pd.DataFrame):
     )
     summary.insert(0, "Hole", labels)
     return z, labels, summary.reset_index()
+
+
+# ─── How sure are we? ─────────────────────────────────────────────────────────
+SKILL_STATS = ["Fairway_Pct", "C1R_Pct", "C2R_Pct", "C1X_Pct", "OB_Pct"]
+
+
+def play_order(rounds: pd.DataFrame) -> pd.DataFrame:
+    """Rounds in the order played: by date, then by Round_ID (R1 before R2 on the same day)."""
+    return rounds.sort_values(["Date", "Round_ID"], kind="stable").reset_index(drop=True)
+
+
+def correlation_history(rounds: pd.DataFrame, score: str, stats=SKILL_STATS, min_rounds: int = 8) -> pd.DataFrame:
+    """Each stat's correlation with score over the first k rounds, for k = min_rounds..N."""
+    r = play_order(rounds)
+    rows = []
+    for k in range(min_rounds, len(r) + 1):
+        head = r.iloc[:k]
+        c = head[stats + [score]].corr()[score]
+        last = head.iloc[-1]
+        for s in stats:
+            rows.append({"Round_number": k, "Date": last["Date"], "Round_Label": last.get("Round_Label", ""),
+                         "Stat": s, "Correlation": c[s]})
+    return pd.DataFrame(rows)
+
+
+def bootstrap_band(rounds: pd.DataFrame, score: str, stats=SKILL_STATS, n_boot: int = 2000,
+                   level: float = 0.80, seed: int = 0) -> pd.DataFrame:
+    """Percentile bootstrap interval for each stat's current correlation (resampling whole rounds)."""
+    rng = np.random.default_rng(seed)
+    y_all = rounds[score].to_numpy(float)
+    idx = rng.integers(0, len(rounds), size=(n_boot, len(rounds)))
+    lo_q, hi_q = (1 - level) / 2 * 100, (1 + level) / 2 * 100
+    rows = []
+    for s in stats:
+        x = rounds[s].to_numpy(float)[idx]
+        y = y_all[idx]
+        xc = x - x.mean(axis=1, keepdims=True)
+        yc = y - y.mean(axis=1, keepdims=True)
+        denom = np.sqrt((xc ** 2).sum(axis=1) * (yc ** 2).sum(axis=1))
+        with np.errstate(invalid="ignore", divide="ignore"):
+            r = (xc * yc).sum(axis=1) / denom
+        r = r[np.isfinite(r)]
+        rows.append({"Stat": s, "Correlation": rounds[s].corr(rounds[score]),
+                     "Low": np.percentile(r, lo_q) if len(r) else np.nan,
+                     "High": np.percentile(r, hi_q) if len(r) else np.nan})
+    return pd.DataFrame(rows)

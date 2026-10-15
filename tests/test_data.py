@@ -85,3 +85,14 @@ def test_readme_summary_is_current():
     import subprocess
     r = subprocess.run([sys.executable, str(ROOT / "tools" / "summary.py"), "--check"], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_correlation_history_ends_at_current(tables):
+    rounds, _ = tables
+    hist = a.correlation_history(rounds, a.PER_18)
+    assert hist["Round_number"].min() == 8 and hist["Round_number"].max() == len(rounds)
+    last = hist[hist["Round_number"] == len(rounds)].set_index("Stat")["Correlation"]
+    now = rounds[a.SKILL_STATS + [a.PER_18]].corr()[a.PER_18].drop(a.PER_18)
+    assert (last - now).abs().max() < 1e-12
+    band = a.bootstrap_band(rounds, a.PER_18).set_index("Stat")
+    assert ((band["Low"] <= band["Correlation"]) & (band["Correlation"] <= band["High"])).all()

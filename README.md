@@ -13,7 +13,7 @@ These numbers come from `python3 tools/summary.py --write` (the same code as the
 
 - **Average round: 5.4 strokes under par per 18** (−5.5 raw). Best round: −17.0 per 18 (−17 over 18 holes at Quailwood, September 26).
 - **Hole mix:** 43% under par (including 13 eagles and 2 aces: Bunker #7, 250 ft, July 7; Bunker #6, 320 ft, August 17), 45% pars, 12% over par. Worst hole on record: a sextuple bogey, 9 on a 477-ft par 3 (Champions Landing, July 26).
-- **Round-level correlations with score per 18,** strongest first: C2R % −0.86, C1R % −0.84, OB rate +0.80, fairway % −0.73, C1X putting % −0.30. Small samples, so these move as rounds are added.
+- **Round-level correlations with score per 18,** strongest first: C2R % −0.86, C1R % −0.84, OB rate +0.80, fairway % −0.73, C1X putting % −0.30. Small samples, so these move as rounds are added: after 8 rounds the strongest was C1X putting % (−0.49), fairway % sat at +0.05; after 35 rounds the strongest was C1R % (−0.85), fairway % sat at −0.73; after 63 rounds the strongest was C2R % (−0.86), fairway % sat at −0.73. The 80% bootstrap bands for C2R % and C1R % overlap, so the top spot is not settled.
 - **Where the strokes go** (cost per 18 versus never making that mistake; these overlap): missed C1R 10.0, missed C2R 5.8, missed fairway 4.9, OB 1.7 strokes.
 - **Missing the green costs about a full stroke:** holes where I miss C1R average 1.04 strokes worse than holes where I hit it.
 - **Distance works mostly through C1R:** on par 3s, distance correlates +0.23 with score but −0.30 with hitting C1R. Holes by par: 871 par 3s, 307 par 4s, 27 par 5s.
