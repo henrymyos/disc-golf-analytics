@@ -594,11 +594,10 @@ if view == "drivers":
             )
             b = band[band["Stat"] == stat].iloc[0]
             fig.add_scatter(
-                x=[n_total], y=[b["Correlation"]], mode="markers+text", showlegend=False,
+                x=[n_total], y=[b["Correlation"]], mode="markers", showlegend=False,
                 marker=dict(color=HIST_COLORS[stat], size=9),
                 error_y=dict(type="data", symmetric=False, array=[b["High"] - b["Correlation"]],
                              arrayminus=[b["Correlation"] - b["Low"]], color=HIST_COLORS[stat], thickness=2, width=6),
-                text=[f" {name}"], textposition="middle right", textfont=dict(color=HIST_COLORS[stat]),
                 hovertemplate=(f"<b>{name}</b> now %{{y:+.2f}}<br>80% band {b['Low']:+.2f} to {b['High']:+.2f}"
                                "<extra></extra>"),
             )
@@ -606,7 +605,7 @@ if view == "drivers":
         fig.update_layout(
             height=420, xaxis_title="Rounds played (in date order)",
             yaxis_title=f"Correlation with score{SCORE_SUFFIX}", yaxis=dict(range=[-1.05, 1.05]),
-            xaxis=dict(range=[MIN_ROUNDS_FOR_HISTORY - 1, n_total + max(4, n_total * 0.18)]),
+            xaxis=dict(range=[MIN_ROUNDS_FOR_HISTORY - 1, n_total + 2]),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
             margin=dict(l=10, r=10, t=40, b=40),
         )
