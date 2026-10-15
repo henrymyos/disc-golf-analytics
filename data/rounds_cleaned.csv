@@ -1,64 +1,64 @@
-Date,Course_Name,Layout,Holes,Course_Par,Score_vs_Par,Fairway_Pct,Scramble_Pct,C1R_Pct,C2R_Pct,C1X_Pct,C2_Pct,OB_Pct,Conditions,Notes
-2026-04-29,RM South,Pro Long,18,58,-9,0.889,0.667,0.667,0.889,0.5,0.2,0.111,Perfect,
-2026-05-02,Sweetwater,Normal,18,55,-6,0.944,0,0.611,0.889,0.583,0.167,0.056,Slight wind,
-2026-05-11,McPherson,Old Baskets,18,55,-6,0.833,0,0.5,0.833,0.429,0.167,0,Slight wind,
-2026-05-11,Little America,Gold,18,65,-9,0.722,1,0.611,0.722,0.714,0,0,Pretty windy,
-2026-05-14,Bunker,Blue,18,59,-6,0.722,0,0.389,0.722,0.75,0.143,0,Very windy,
-2026-05-15,Bassett Creek,Main,18,54,-10,0.833,1,0.389,0.833,0.857,0.5,0,Slight wind,early morning
-2026-05-16,Oakwood Park,Longs,18,60,-10,0.833,1,0.667,0.833,0.8,0,0.056,Slight wind,Lost Yellow Boss
-2026-05-17,Oakwood Park,26 Spring Open,20,67,-9,0.55,0.833,0.45,0.65,0.889,0.5,0.05,Pretty windy,Oakwood Spring Open
-2026-05-17,Oakwood Park,26 Spring Open,20,67,-15,0.9,1,0.85,0.9,0.727,0,0,Pretty windy,Oakwood Spring Open
-2026-05-18,Bunker,Blue,18,59,-4,0.667,0.5,0.444,0.722,0.778,0.143,0,Perfect,
-2026-05-19,Bethel,Main,18,58,2,0.667,0.5,0.333,0.611,0.625,0,0,Pretty windy,
-2026-05-21,Ham Lake,"Longs, Front 9",9,28,-6,1,0,0.778,1,0.667,0.5,0,Perfect,W / Ethan and Isaac
-2026-05-22,Bryant Lake,Long to Blue,18,59,-10,1,0,0.722,1,0.667,0,0,Slight rain,early morning
-2026-05-24,Ham Lake,Longs,18,56,-12,0.944,1,0.833,1,0.7,0,0,Slight wind,
-2026-05-24,Ham Lake,Longs,18,56,-8,0.889,0.5,0.556,0.889,0.714,0.125,0,Slight wind,
-2026-05-26,Blue Ribbon Pines,Pro Majestic 2026,27,92,-5,0.667,0.556,0.37,0.593,1,0.11,0.148,Slight wind,
-2026-05-27,Bryant Lake,Long to Blue,18,59,-13,0.889,0,0.778,0.889,0.8,0.333,0,Perfect,early morning
-2026-05-28,Bethel,Main,18,58,-10,0.833,0,0.556,0.833,0.857,0.333,0,Slight wind,
-2026-05-29,Bryant Lake,Long to Blue,18,59,-12,0.833,1,0.722,0.833,0.833,0,0,Slight wind,Flex Tourney
-2026-05-30,Bethel,Main,18,59,-6,0.722,0.333,0.556,0.722,0.5,0.2,0,Pretty windy,Twin Cities Champ
-2026-05-30,Bethel,Main,18,59,-7,0.722,0,0.556,0.722,0.778,0.25,0.111,Pretty windy,Twin Cities Champ
-2026-06-09,Bunker,Blue,18,59,-1,0.556,0.75,0.278,0.556,0.714,0.125,0,Slight wind,
-2026-06-10,Blue Ribbon Pines,Pro Majestic 2026,27,92,-6,0.63,0.571,0.37,0.593,0.909,0.2,0.111,Pretty windy,
-2026-06-12,Blue Ribbon Pines,Pro Majestic 2026,27,92,-1,0.667,0.3,0.444,0.593,0.636,0,0.185,Pretty windy,
-2026-06-13,Blue Ribbon Pines,Pro Majestic 2026,27,92,-2,0.607,0,0.259,0.481,0.778,0.364,0.074,Really windy,The Majestic
-2026-06-14,Blue Ribbon Pines,Pro Majestic 2026,27,92,4,0.5,0.273,0.296,0.519,0.667,0.125,0.222,Really windy,The Majestic
-2026-06-15,Bunker,Blue,18,59,-3,0.556,0.5,0.444,0.611,0.6,0,0,Slight wind,
-2026-06-28,Bunker,Blue,18,59,-4,0.833,0.667,0.444,0.833,0.5,0,0,Perfect,Played with Dad
-2026-06-30,Bunker,Blue,18,59,-4,0.722,0.5,0.333,0.611,1,0,0,Perfect,
-2026-07-02,Wintercrest,Main,21,65,-9,0.667,1,0.524,0.714,0.714,0,0,Perfect,
-2026-07-05,Elm Creek,Main,18,56,-4,0.667,1,0.389,0.722,0.571,0,0,Hot,
-2026-07-06,Blue Ribbon Pines,No Combos,27,87,-14,0.815,1,0.519,0.815,0.692,0.375,0,Hot,
-2026-07-07,Bunker,Blue,18,59,-11,0.722,1,0.556,0.722,0.667,0.5,0,Hot,Got Ace #7
-2026-07-08,Bethel,Twin Town Long,18,57,-7,0.833,0,0.5,0.833,0.667,0,0,Hot,
-2026-07-09,Blue Ribbon Pines,BRP Cash Open 2026,30,95,-9,0.7,0.667,0.433,0.7,0.688,0.111,0.067,Hot,
-2026-07-11,Blue Ribbon Pines,BRP Cash Open 2026,30,95,-1,0.667,0.333,0.333,0.633,0.5,0.3,0.033,Hot,BRP Cash Open 2026
-2026-07-13,Kaposia,Twin Town Long,18,58,-5,0.778,1,0.278,0.778,0.833,0.1,0,Hot,
-2026-07-14,Bunker,Blue,18,59,-11,0.889,1,0.389,0.889,1,0.4,0,Hot,
-2026-07-15,Bethel,Twin Town Long,18,57,-4,0.778,0.667,0.333,0.722,0.8,0.25,0,Hot,Played with Chris
-2026-07-17,Kaposia,Twin Town Long,18,58,-7,0.722,0,0.556,0.722,0.833,0,0,Hot,Twin Town
-2026-07-18,Bethel,Twin Town Long,18,57,-1,0.5,0.429,0.333,0.556,1,0.167,0.111,Hot,Twin Town
-2026-07-19,Kaposia,Twin Town Long,18,58,-5,0.556,0.75,0.333,0.556,0.833,0.333,0,Hot,Twin Town
-2026-07-20,Elm Creek,Main,18,56,-5,0.667,1,0.444,0.667,0.625,0.2,0,Hot,
-2026-07-22,Champions Landing,Black - MPO 2026,18,67,8,0.5,0.1,0.111,0.278,0.667,0.4,0.556,Slight Wind,
-2026-07-23,Champions Landing,Black - MPO 2026,18,67,-3,0.833,0,0.333,0.556,0.571,0.4,0.056,Perfect,
-2026-07-24,Champions Landing,Black - MPO 2026,18,67,1,0.75,0,0.333,0.389,0.8,0,0.222,Rain and Windy,JOMEZ
-2026-07-25,Champions Landing,Black - MPO 2026,18,67,6,0.45,0.25,0.056,0.167,0.75,0.429,0.333,Hot,JOMEZ
-2026-07-26,Champions Landing,Black - MPO 2026,18,67,20,0.5,0,0.111,0.278,0.444,0,0.611,Hot and Windy,JOMEZ
-2026-08-02,Bunker,Blue,18,59,-5,0.611,0,0.444,0.611,0.667,0.167,0,Perfect,
-2026-08-02,Pickard Park,Gold - MPO 2026,18,64,2,0.556,0,0.167,0.389,0.6,0.333,0.222,Perfect,
-2026-08-03,Pickard Park,Gold - MPO 2026,18,64,12,0.421,0.091,0.167,0.222,0.714,0,0.389,Perfect,Discmania Qualifier
-2026-08-06,Bunker,Blue,18,59,-5,0.611,0.667,0.389,0.722,1,0,0,Hot,
-2026-08-09,Driftless 9,Main,9,27,-3,1,0,0.556,1,0.2,0.5,0,Hot,
-2026-08-11,Bunker,Blue,18,59,-10,0.611,1,0.556,0.722,0.9,0,0,Hot,
-2026-08-17,Bunker,Blue,18,59,-10,0.833,1,0.611,0.833,0.889,0,0,Perfect,Got Ace #8
-2026-09-25,Quailwood,Copper - LONG,18,62,-9,0.833,0,0.556,0.833,0.889,0.167,0.056,Hot,AZ States
-2026-09-26,Quailwood,Gold,18,64,-17,0.889,0,0.833,0.889,1,0.4,0.056,Hot,AZ States
-2026-09-27,Quailwood,Copper - LONG,18,62,-10,0.889,1,0.611,0.889,0.818,0,0.056,Hot,AZ States
-2026-10-03,Fort Tuthill,Breeze 2026,20,62,-9,0.75,0.333,0.55,0.75,0.818,0.25,0,Perfect,The Breeze
-2026-10-03,Fort Tuthill,Breeze 2026,20,62,-8,0.75,0.5,0.4,0.75,0.8,0.25,0.05,Slight wind,The Breeze
-2026-10-06,Sweetwater,Flex 2026,18,58,-13,0.944,0,0.722,0.944,0.75,0.4,0,Perfect,Sweetwater Flex
-2026-10-11,RM South,Desert Throwdown,18,59,-9,0.833,1,0.611,0.889,0.727,0,0,Pretty windy,Desert Throwdown
-2026-10-11,RM North,Desert Throwdown,18,57,-5,0.833,0.333,0.667,0.833,0.667,0,0.111,Pretty windy,Desert Throwdown
+Date,Course_Name,Layout,Holes,Course_Par,Score_vs_Par,Fairway_Pct,Scramble_Pct,C1R_Pct,C2R_Pct,C1X_Pct,C2_Pct,OB_Pct,Conditions,Notes,Round_ID
+2026-04-29,RM South,Pro Long,18,58,-9,0.889,0.667,0.667,0.889,0.5,0.2,0.111,Perfect,,2026-04-29_rm-south_1
+2026-05-02,Sweetwater,Normal,18,55,-6,0.944,0,0.611,0.889,0.583,0.167,0.056,Slight wind,,2026-05-02_sweetwater_1
+2026-05-11,McPherson,Old Baskets,18,55,-6,0.833,0,0.5,0.833,0.429,0.167,0,Slight wind,,2026-05-11_mcpherson_1
+2026-05-11,Little America,Gold,18,65,-9,0.722,1,0.611,0.722,0.714,0,0,Pretty windy,,2026-05-11_little-america_1
+2026-05-14,Bunker,Blue,18,59,-6,0.722,0,0.389,0.722,0.75,0.143,0,Very windy,,2026-05-14_bunker_1
+2026-05-15,Bassett Creek,Main,18,54,-10,0.833,1,0.389,0.833,0.857,0.5,0,Slight wind,early morning,2026-05-15_bassett-creek_1
+2026-05-16,Oakwood Park,Longs,18,60,-10,0.833,1,0.667,0.833,0.8,0,0.056,Slight wind,Lost Yellow Boss,2026-05-16_oakwood-park_1
+2026-05-17,Oakwood Park,26 Spring Open,20,67,-9,0.55,0.833,0.45,0.65,0.889,0.5,0.05,Pretty windy,Oakwood Spring Open,2026-05-17_oakwood-park_1
+2026-05-17,Oakwood Park,26 Spring Open,20,67,-15,0.9,1,0.85,0.9,0.727,0,0,Pretty windy,Oakwood Spring Open,2026-05-17_oakwood-park_2
+2026-05-18,Bunker,Blue,18,59,-4,0.667,0.5,0.444,0.722,0.778,0.143,0,Perfect,,2026-05-18_bunker_1
+2026-05-19,Bethel,Main,18,58,2,0.667,0.5,0.333,0.611,0.625,0,0,Pretty windy,,2026-05-19_bethel_1
+2026-05-21,Ham Lake,"Longs, Front 9",9,28,-6,1,0,0.778,1,0.667,0.5,0,Perfect,W / Ethan and Isaac,2026-05-21_ham-lake_1
+2026-05-22,Bryant Lake,Long to Blue,18,59,-10,1,0,0.722,1,0.667,0,0,Slight rain,early morning,2026-05-22_bryant-lake_1
+2026-05-24,Ham Lake,Longs,18,56,-12,0.944,1,0.833,1,0.7,0,0,Slight wind,,2026-05-24_ham-lake_1
+2026-05-24,Ham Lake,Longs,18,56,-8,0.889,0.5,0.556,0.889,0.714,0.125,0,Slight wind,,2026-05-24_ham-lake_2
+2026-05-26,Blue Ribbon Pines,Pro Majestic 2026,27,92,-5,0.667,0.556,0.37,0.593,1,0.11,0.148,Slight wind,,2026-05-26_blue-ribbon-pines_1
+2026-05-27,Bryant Lake,Long to Blue,18,59,-13,0.889,0,0.778,0.889,0.8,0.333,0,Perfect,early morning,2026-05-27_bryant-lake_1
+2026-05-28,Bethel,Main,18,58,-10,0.833,0,0.556,0.833,0.857,0.333,0,Slight wind,,2026-05-28_bethel_1
+2026-05-29,Bryant Lake,Long to Blue,18,59,-12,0.833,1,0.722,0.833,0.833,0,0,Slight wind,Flex Tourney,2026-05-29_bryant-lake_1
+2026-05-30,Bethel,Main,18,59,-6,0.722,0.333,0.556,0.722,0.5,0.2,0,Pretty windy,Twin Cities Champ,2026-05-30_bethel_1
+2026-05-30,Bethel,Main,18,59,-7,0.722,0,0.556,0.722,0.778,0.25,0.111,Pretty windy,Twin Cities Champ,2026-05-30_bethel_2
+2026-06-09,Bunker,Blue,18,59,-1,0.556,0.75,0.278,0.556,0.714,0.125,0,Slight wind,,2026-06-09_bunker_1
+2026-06-10,Blue Ribbon Pines,Pro Majestic 2026,27,92,-6,0.63,0.571,0.37,0.593,0.909,0.2,0.111,Pretty windy,,2026-06-10_blue-ribbon-pines_1
+2026-06-12,Blue Ribbon Pines,Pro Majestic 2026,27,92,-1,0.667,0.3,0.444,0.593,0.636,0,0.185,Pretty windy,,2026-06-12_blue-ribbon-pines_1
+2026-06-13,Blue Ribbon Pines,Pro Majestic 2026,27,92,-2,0.607,0,0.259,0.481,0.778,0.364,0.074,Really windy,The Majestic,2026-06-13_blue-ribbon-pines_1
+2026-06-14,Blue Ribbon Pines,Pro Majestic 2026,27,92,4,0.5,0.273,0.296,0.519,0.667,0.125,0.222,Really windy,The Majestic,2026-06-14_blue-ribbon-pines_1
+2026-06-15,Bunker,Blue,18,59,-3,0.556,0.5,0.444,0.611,0.6,0,0,Slight wind,,2026-06-15_bunker_1
+2026-06-28,Bunker,Blue,18,59,-4,0.833,0.667,0.444,0.833,0.5,0,0,Perfect,Played with Dad,2026-06-28_bunker_1
+2026-06-30,Bunker,Blue,18,59,-4,0.722,0.5,0.333,0.611,1,0,0,Perfect,,2026-06-30_bunker_1
+2026-07-02,Wintercrest,Main,21,65,-9,0.667,1,0.524,0.714,0.714,0,0,Perfect,,2026-07-02_wintercrest_1
+2026-07-05,Elm Creek,Main,18,56,-4,0.667,1,0.389,0.722,0.571,0,0,Hot,,2026-07-05_elm-creek_1
+2026-07-06,Blue Ribbon Pines,No Combos,27,87,-14,0.815,1,0.519,0.815,0.692,0.375,0,Hot,,2026-07-06_blue-ribbon-pines_1
+2026-07-07,Bunker,Blue,18,59,-11,0.722,1,0.556,0.722,0.667,0.5,0,Hot,Got Ace #7,2026-07-07_bunker_1
+2026-07-08,Bethel,Twin Town Long,18,57,-7,0.833,0,0.5,0.833,0.667,0,0,Hot,,2026-07-08_bethel_1
+2026-07-09,Blue Ribbon Pines,BRP Cash Open 2026,30,95,-9,0.7,0.667,0.433,0.7,0.688,0.111,0.067,Hot,,2026-07-09_blue-ribbon-pines_1
+2026-07-11,Blue Ribbon Pines,BRP Cash Open 2026,30,95,-1,0.667,0.333,0.333,0.633,0.5,0.3,0.033,Hot,BRP Cash Open 2026,2026-07-11_blue-ribbon-pines_1
+2026-07-13,Kaposia,Twin Town Long,18,58,-5,0.778,1,0.278,0.778,0.833,0.1,0,Hot,,2026-07-13_kaposia_1
+2026-07-14,Bunker,Blue,18,59,-11,0.889,1,0.389,0.889,1,0.4,0,Hot,,2026-07-14_bunker_1
+2026-07-15,Bethel,Twin Town Long,18,57,-4,0.778,0.667,0.333,0.722,0.8,0.25,0,Hot,Played with Chris,2026-07-15_bethel_1
+2026-07-17,Kaposia,Twin Town Long,18,58,-7,0.722,0,0.556,0.722,0.833,0,0,Hot,Twin Town,2026-07-17_kaposia_1
+2026-07-18,Bethel,Twin Town Long,18,57,-1,0.5,0.429,0.333,0.556,1,0.167,0.111,Hot,Twin Town,2026-07-18_bethel_1
+2026-07-19,Kaposia,Twin Town Long,18,58,-5,0.556,0.75,0.333,0.556,0.833,0.333,0,Hot,Twin Town,2026-07-19_kaposia_1
+2026-07-20,Elm Creek,Main,18,56,-5,0.667,1,0.444,0.667,0.625,0.2,0,Hot,,2026-07-20_elm-creek_1
+2026-07-22,Champions Landing,Black - MPO 2026,18,67,8,0.5,0.1,0.111,0.278,0.667,0.4,0.556,Slight Wind,,2026-07-22_champions-landing_1
+2026-07-23,Champions Landing,Black - MPO 2026,18,67,-3,0.833,0,0.333,0.556,0.571,0.4,0.056,Perfect,,2026-07-23_champions-landing_1
+2026-07-24,Champions Landing,Black - MPO 2026,18,67,1,0.75,0,0.333,0.389,0.8,0,0.222,Rain and Windy,JOMEZ,2026-07-24_champions-landing_1
+2026-07-25,Champions Landing,Black - MPO 2026,18,67,6,0.45,0.25,0.056,0.167,0.75,0.429,0.333,Hot,JOMEZ,2026-07-25_champions-landing_1
+2026-07-26,Champions Landing,Black - MPO 2026,18,67,20,0.5,0,0.111,0.278,0.444,0,0.611,Hot and Windy,JOMEZ,2026-07-26_champions-landing_1
+2026-08-02,Bunker,Blue,18,59,-5,0.611,0,0.444,0.611,0.667,0.167,0,Perfect,,2026-08-02_bunker_1
+2026-08-02,Pickard Park,Gold - MPO 2026,18,64,2,0.556,0,0.167,0.389,0.6,0.333,0.222,Perfect,,2026-08-02_pickard-park_1
+2026-08-03,Pickard Park,Gold - MPO 2026,18,64,12,0.421,0.091,0.167,0.222,0.714,0,0.389,Perfect,Discmania Qualifier,2026-08-03_pickard-park_1
+2026-08-06,Bunker,Blue,18,59,-5,0.611,0.667,0.389,0.722,1,0,0,Hot,,2026-08-06_bunker_1
+2026-08-09,Driftless 9,Main,9,27,-3,1,0,0.556,1,0.2,0.5,0,Hot,,2026-08-09_driftless-9_1
+2026-08-11,Bunker,Blue,18,59,-10,0.611,1,0.556,0.722,0.9,0,0,Hot,,2026-08-11_bunker_1
+2026-08-17,Bunker,Blue,18,59,-10,0.833,1,0.611,0.833,0.889,0,0,Perfect,Got Ace #8,2026-08-17_bunker_1
+2026-09-25,Quailwood,Copper - LONG,18,62,-9,0.833,0,0.556,0.833,0.889,0.167,0.056,Hot,AZ States,2026-09-25_quailwood_1
+2026-09-26,Quailwood,Gold,18,64,-17,0.889,0,0.833,0.889,1,0.4,0.056,Hot,AZ States,2026-09-26_quailwood_1
+2026-09-27,Quailwood,Copper - LONG,18,62,-10,0.889,1,0.611,0.889,0.818,0,0.056,Hot,AZ States,2026-09-27_quailwood_1
+2026-10-03,Fort Tuthill,Breeze 2026,20,62,-9,0.75,0.333,0.55,0.75,0.818,0.25,0,Perfect,The Breeze,2026-10-03_fort-tuthill_1
+2026-10-03,Fort Tuthill,Breeze 2026,20,62,-8,0.75,0.5,0.4,0.75,0.8,0.25,0.05,Slight wind,The Breeze,2026-10-03_fort-tuthill_2
+2026-10-06,Sweetwater,Flex 2026,18,58,-13,0.944,0,0.722,0.944,0.75,0.4,0,Perfect,Sweetwater Flex,2026-10-06_sweetwater_1
+2026-10-11,RM South,Desert Throwdown,18,59,-9,0.833,1,0.611,0.889,0.727,0,0,Pretty windy,Desert Throwdown,2026-10-11_rm-south_1
+2026-10-11,RM North,Desert Throwdown,18,57,-5,0.833,0.333,0.667,0.833,0.667,0,0.111,Pretty windy,Desert Throwdown,2026-10-11_rm-north_1

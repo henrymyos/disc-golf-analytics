@@ -25,8 +25,10 @@ COURSE_NAMES = DATA / "course_names.json"       # PDGA layout name -> [Course_Na
 WEATHER = DATA / "conditions_weather.csv"       # past rounds' weather + the Conditions label given
 
 ROUND_COLS = ["Date", "Course_Name", "Layout", "Holes", "Course_Par", "Score_vs_Par", "Fairway_Pct",
-              "Scramble_Pct", "C1R_Pct", "C2R_Pct", "C1X_Pct", "C2_Pct", "OB_Pct", "Conditions", "Notes"]
-HOLE_COLS = ["Date", "Course_Name", "Hole", "Par", "Distance", "Score_Label", "Shot_Type", "Fairway", "C1R", "C2R", "OB"]
+              "Scramble_Pct", "C1R_Pct", "C2R_Pct", "C1X_Pct", "C2_Pct", "OB_Pct", "Conditions", "Notes",
+              "Round_ID"]
+HOLE_COLS = ["Date", "Course_Name", "Hole", "Par", "Distance", "Score_Label", "Shot_Type", "Fairway", "C1R", "C2R", "OB",
+             "Round_ID", "Hole_Pos"]
 WEATHER_COLS = ["Date", "Course_Name", "Conditions", "Temp_Max_F", "Wind_Mph", "Gust_Max_Mph", "Rain_Mm"]
 SHOT_TYPES = ["BH", "FH", "BH ROLLER", "FH ROLLER"]
 LABELS = {-2: "EAGLE", -1: "BIRDIE", 0: "PAR", 1: "BOGEY", 2: "DOUBLE BOGEY", 3: "TRIPLE BOGEY",
@@ -164,6 +166,31 @@ def suggest_conditions(w: dict | None, past: list[dict] | None = None, k: int = 
 
 # ─── Building the CSV rows ────────────────────────────────────────────────────
 
+def course_slug(course: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", course.lower()).strip("-")
+
+
+def make_round_id(date: str, course: str, n: int) -> str:
+    """YYYY-MM-DD_<course-slug>_<n>: n counts rounds at that course that day, in the order they were logged."""
+    return f"{date}_{course_slug(course)}_{n}"
+
+
+def next_round_id(date: str, course: str) -> str:
+    n = 1
+    if ROUNDS_CSV.exists():
+        with open(ROUNDS_CSV, newline="") as f:
+            n += sum(r["Date"] == date and r["Course_Name"] == course for r in csv.DictReader(f))
+    return make_round_id(date, course, n)
+
+
+def hole_score_vs_par(h: dict) -> int:
+    """Score vs par of a holes_cleaned.csv row (an ace is 1 stroke, whatever the par)."""
+    label, par = h["Score_Label"], int(h["Par"])
+    if label == "ACE":
+        return 1 - par
+    return next(k for k, v in LABELS.items() if v == label)
+
+
 def is_fairway(driving: str | None, par: int) -> bool:
     # A par-3 drive only counts if it finishes inside C2; on longer holes landing in the fairway is enough.
     return driving in (("c1", "c2", "parked") if par == 3 else ("hit", "c1", "c2", "parked"))
@@ -181,8 +208,9 @@ def round_date(r: dict) -> str:
 
 def build_rows(r: dict, course: str, layout: str, shots: list[str], conditions: str, notes: str):
     date, n = round_date(r), len(r["holes"])
+    round_id = next_round_id(date, course)
     holes = []
-    for h, shot in zip(r["holes"], shots):
+    for pos, (h, shot) in enumerate(zip(r["holes"], shots), start=1):
         diff = h["score"] - h["par"]
         label = "ACE" if h["score"] == 1 else LABELS.get(diff)
         if label is None:
@@ -191,7 +219,7 @@ def build_rows(r: dict, course: str, layout: str, shots: list[str], conditions: 
         holes.append({"Date": date, "Course_Name": course, "Hole": h["hole"], "Par": h["par"], "Distance": h["length"],
                       "Score_Label": label, "Shot_Type": shot, "Fairway": "YES" if is_fairway(h["driving"], h["par"]) else "NO",
                       "C1R": "YES" if c1 else "NO", "C2R": "YES" if c1 or h["green"] == "c2" else "NO",
-                      "OB": "YES" if (h["ob"] or 0) > 0 else "NO"})
+                      "OB": "YES" if (h["ob"] or 0) > 0 else "NO", "Round_ID": round_id, "Hole_Pos": pos})
     pct = lambda yes, total: round(yes / total, 3) if total else 0
     stat = lambda i: r["stats"].get(str(i), [0, 0])
     ob_throws = stat(OB_COUNT)[0] if str(OB_COUNT) in r["stats"] else sum(h["ob"] or 0 for h in r["holes"])
@@ -202,7 +230,7 @@ def build_rows(r: dict, course: str, layout: str, shots: list[str], conditions: 
            "C1R_Pct": pct(sum(x["C1R"] == "YES" for x in holes), n),
            "C2R_Pct": pct(sum(x["C2R"] == "YES" for x in holes), n),
            "C1X_Pct": pct(*stat(C1X_PUTTING)), "C2_Pct": pct(*stat(C2_PUTTING)),
-           "OB_Pct": pct(ob_throws, n), "Conditions": conditions, "Notes": notes}
+           "OB_Pct": pct(ob_throws, n), "Conditions": conditions, "Notes": notes, "Round_ID": round_id}
     return rnd, holes
 
 
@@ -212,6 +240,13 @@ def _append(path: Path, cols: list[str], rows: list[dict]):
         with open(path, "rb") as f:
             f.seek(-1, 2)
             needs_newline = f.read(1) != b"\n"
+        # Write in the file's own column order so a column added to the CSV later never shifts values.
+        with open(path, newline="") as f:
+            header = next(csv.reader(f))
+        missing = [c for c in cols if c not in header]
+        if missing:
+            raise ValueError(f"{path.name} has no {', '.join(missing)} column; run tools/backfill_round_ids.py first")
+        cols = header
     with open(path, "a", newline="") as f:
         if new:
             f.write(",".join(cols) + "\n")
@@ -239,17 +274,16 @@ def already_logged(r: dict) -> bool:
 def last_logged_shots(course: str, layout: str, n: int) -> tuple[str, list[str]] | None:
     """Tee shots from the most recent logged round on this course and layout (for 'copy from last time')."""
     with open(ROUNDS_CSV, newline="") as f:
-        dates = sorted({r["Date"] for r in csv.DictReader(f)
-                        if r["Course_Name"] == course and r["Layout"] == layout and int(r["Holes"]) == n}, reverse=True)
-    if not dates:
+        matches = sorted(((r["Date"], r["Round_ID"]) for r in csv.DictReader(f)
+                          if r["Course_Name"] == course and r["Layout"] == layout and int(r["Holes"]) == n), reverse=True)
+    if not matches:
         return None
+    date, rid = matches[0]
     with open(HOLES_CSV, newline="") as f:
-        holes = [h for h in csv.DictReader(f) if h["Course_Name"] == course and h["Date"] in dates]
-    for d in dates:
-        rows = [h for h in holes if h["Date"] == d]
-        if len(rows) == n:  # two rounds there that day would be ambiguous, so skip those
-            return d, [h["Shot_Type"].strip() for h in sorted(rows, key=lambda h: int(h["Hole"]))]
-    return None
+        rows = [h for h in csv.DictReader(f) if h["Round_ID"] == rid]
+    if len(rows) != n:
+        return None
+    return date, [h["Shot_Type"].strip() for h in sorted(rows, key=lambda h: int(h["Hole_Pos"]))]
 
 
 def save_round(r: dict, course: str, layout: str, shots: list[str], conditions: str, notes: str, weather: dict | None):

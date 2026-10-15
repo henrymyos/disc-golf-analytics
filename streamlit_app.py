@@ -15,6 +15,7 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import LeaveOneOut, cross_val_predict
 
 from analysis import HOLES_PATH, PER_18, RAW, ROUNDS_PATH, DataError, load_tables
+from scorecard import scorecard_html
 
 # ─── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -92,20 +93,12 @@ date_range = st.sidebar.date_input(
     max_value=max_date,
 )
 
-# Apply filters
+# Apply filters. Filters pick rounds; holes follow their round via Round_ID.
+rounds_f = rounds[rounds["Course_Name"].isin(selected_courses)]
 if isinstance(date_range, tuple) and len(date_range) == 2:
     start, end = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])
-    rounds_f = rounds[
-        (rounds["Date"] >= start) & (rounds["Date"] <= end)
-        & (rounds["Course_Name"].isin(selected_courses))
-    ]
-    holes_f = holes[
-        (holes["Date"] >= start) & (holes["Date"] <= end)
-        & (holes["Course_Name"].isin(selected_courses))
-    ]
-else:
-    rounds_f = rounds[rounds["Course_Name"].isin(selected_courses)]
-    holes_f = holes[holes["Course_Name"].isin(selected_courses)]
+    rounds_f = rounds_f[(rounds_f["Date"] >= start) & (rounds_f["Date"] <= end)]
+holes_f = holes[holes["Round_ID"].isin(rounds_f["Round_ID"])]
 
 st.sidebar.divider()
 st.sidebar.markdown(
@@ -153,9 +146,10 @@ with tab1:
     with col1:
         st.subheader("Score trend over time")
         fig = px.line(
-            rounds_f.sort_values("Date"),
+            rounds_f.sort_values("Date", kind="stable"),
             x="Date", y=SCORE,
             markers=True,
+            custom_data=["Round_ID"],
             hover_data={"Course_Name": True, "Layout": True, "Holes": True,
                         "Score_vs_Par": True, "Score_per_18": ":.1f", "Conditions": True},
             labels={"Score_vs_Par": "Score vs par (raw)", "Score_per_18": "Score vs par (per 18)",
@@ -168,8 +162,16 @@ with tab1:
             height=350,
             yaxis_title=f"Strokes vs par{SCORE_SUFFIX} (lower = better)",
             yaxis=dict(autorange="reversed"),
+            clickmode="event+select",
         )
-        st.plotly_chart(fig, use_container_width=True)
+        trend_event = st.plotly_chart(fig, use_container_width=True, key="trend",
+                                      on_select="rerun", selection_mode="points")
+        st.caption("Click a point to open that round's scorecard below.")
+        picked = tuple(p["customdata"][0] for p in trend_event.selection.points
+                       if p.get("customdata")) if trend_event else ()
+        if picked and picked != st.session_state.get("_trend_pick"):
+            st.session_state["round_pick"] = picked[0]
+        st.session_state["_trend_pick"] = picked
 
     with col2:
         st.subheader("Score distribution")
@@ -200,6 +202,42 @@ with tab1:
         .round(2).reset_index().sort_values("Avg_score")
     )
     st.dataframe(course_stats, use_container_width=True, hide_index=True)
+
+
+    # ─── Scorecard ───────────────────────────────────────────────────────────
+    st.subheader("Scorecard")
+    round_opts = rounds_f.sort_values("Date", ascending=False, kind="stable")["Round_ID"].tolist()
+    labels = dict(zip(rounds["Round_ID"], rounds["Round_Label"]))
+    if st.session_state.get("round_pick") not in round_opts:
+        st.session_state["round_pick"] = None
+    rid = st.selectbox("Round", round_opts, key="round_pick", index=None,
+                       format_func=lambda r: labels.get(r, r),
+                       placeholder="Pick a round, or click a point on the trend")
+    if rid:
+        rnd = rounds.loc[rounds["Round_ID"] == rid].iloc[0]
+        rh = holes[holes["Round_ID"] == rid]
+        st.markdown(
+            f"**{rnd['Round_Label']}** · {int(rnd['Holes'])} holes · par {int(rnd['Course_Par'])} · "
+            f"**{int(rnd['Score_vs_Par']):+d}** ({rnd['Score_per_18']:+.1f} per 18) · {rnd['Conditions']}"
+            + (f" · {rnd['Notes']}" if isinstance(rnd["Notes"], str) and rnd["Notes"].strip() else "")
+        )
+        st.markdown(scorecard_html(rh, SCORE_COLORS), unsafe_allow_html=True)
+
+        stat_rows = [("Score vs par (per 18)", "Score_per_18", "score"),
+                     ("Score vs par (raw)", "Score_vs_Par", "score"),
+                     ("Fairway", "Fairway_Pct", "pct"), ("C1R (green in reg)", "C1R_Pct", "pct"),
+                     ("C2R", "C2R_Pct", "pct"), ("C1X putting", "C1X_Pct", "pct"),
+                     ("C2 putting", "C2_Pct", "pct"), ("Scramble", "Scramble_Pct", "pct"),
+                     ("OB rate", "OB_Pct", "pct")]
+        fmt = {"score": lambda v: f"{v:+.1f}", "pct": lambda v: f"{v:.0%}"}
+        dfmt = {"score": lambda v: f"{v:+.1f}", "pct": lambda v: f"{v * 100:+.0f} pts"}
+        compare = pd.DataFrame([
+            {"Stat": name, "This round": fmt[kind](rnd[col]),
+             f"My average ({len(rounds_f)} rounds in view)": fmt[kind](rounds_f[col].mean()),
+             "Difference": dfmt[kind](rnd[col] - rounds_f[col].mean())}
+            for name, col, kind in stat_rows if col in rnd.index
+        ])
+        st.dataframe(compare, use_container_width=True, hide_index=True)
 
 
 # ─── Tab 2: What Drives My Score ──────────────────────────────────────────────

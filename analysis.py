@@ -32,6 +32,8 @@ class DataError(ValueError):
 def add_per_18(rounds: pd.DataFrame) -> pd.DataFrame:
     rounds = rounds.copy()
     rounds[PER_18] = rounds[RAW] * 18 / rounds["Holes"]
+    if "Round_ID" in rounds.columns:
+        rounds["Round_Label"] = round_labels(rounds)
     return rounds
 
 
@@ -61,4 +63,55 @@ def load_tables(rounds_path: str = ROUNDS_PATH, holes_path: str = HOLES_PATH):
     holes["C2R_bin"] = (holes["C2R"] == "YES").astype(int)
     holes["Fairway_bin"] = (holes["Fairway"] == "YES").astype(int)
     holes["OB_bin"] = (holes["OB"] == "YES").astype(int)
+    problems = check_round_totals(rounds, holes)
+    if problems:
+        shown = "\n".join(f"- {p}" for p in problems[:15])
+        more = f"\n- …and {len(problems) - 15} more" if len(problems) > 15 else ""
+        raise DataError(
+            f"The hole rows don't add up to the round rows, so per-round numbers would be "
+            f"wrong. Fix these in {holes_path} / {rounds_path}:\n{shown}{more}"
+        )
+    holes = holes.sort_values(["Date", "Round_ID", "Hole_Pos"], kind="stable").reset_index(drop=True)
     return add_per_18(rounds), holes
+
+
+def check_round_totals(rounds: pd.DataFrame, holes: pd.DataFrame) -> list[str]:
+    """Every hole belongs to a round, and every round's holes match its hole count and score."""
+    for name, df, cols in (("rounds", rounds, ["Round_ID"]), ("holes", holes, ["Round_ID", "Hole_Pos"])):
+        missing = [c for c in cols if c not in df.columns]
+        if missing:
+            return [f"the {name} table has no {', '.join(missing)} column (run tools/backfill_round_ids.py)"]
+    problems = []
+    if rounds["Round_ID"].isna().any():
+        problems.append(f"{int(rounds['Round_ID'].isna().sum())} round rows have no Round_ID")
+    dupes = sorted(rounds.loc[rounds["Round_ID"].duplicated(), "Round_ID"].dropna())
+    if dupes:
+        problems.append(f"Round_ID used by more than one round: {dupes}")
+    orphan = sorted(set(holes["Round_ID"].dropna()) - set(rounds["Round_ID"]))
+    if orphan:
+        problems.append(f"hole rows point at Round_IDs that aren't in the rounds table: {orphan}")
+    if holes["Round_ID"].isna().any():
+        problems.append(f"{int(holes['Round_ID'].isna().sum())} hole rows have no Round_ID")
+    per_round = holes.groupby("Round_ID").agg(n=("Score_vs_Par", "size"), score=("Score_vs_Par", "sum"),
+                                              pos_ok=("Hole_Pos", lambda p: sorted(p) == list(range(1, len(p) + 1))))
+    for _, r in rounds.dropna(subset=["Round_ID"]).iterrows():
+        got = per_round.loc[r["Round_ID"]] if r["Round_ID"] in per_round.index else None
+        if got is None:
+            problems.append(f"{r['Round_ID']}: no hole rows")
+            continue
+        if int(got["n"]) != int(r["Holes"]):
+            problems.append(f"{r['Round_ID']}: {int(got['n'])} hole rows, round says {int(r['Holes'])} holes")
+        if int(got["score"]) != int(r["Score_vs_Par"]):
+            problems.append(f"{r['Round_ID']}: holes add up to {int(got['score']):+d}, round says {int(r['Score_vs_Par']):+d}")
+        if not got["pos_ok"]:
+            problems.append(f"{r['Round_ID']}: Hole_Pos isn't 1..{int(got['n'])}")
+    return problems
+
+
+def round_labels(rounds: pd.DataFrame) -> pd.Series:
+    """'Oct 3, 2026 · Fort Tuthill (Breeze 2026) · R2' labels; the R-number only when a course was played twice that day."""
+    doubles = rounds.groupby(["Date", "Course_Name"])["Round_ID"].transform("size") > 1
+    n = rounds["Round_ID"].astype(str).str.rsplit("_", n=1).str[-1]
+    base = (rounds["Date"].dt.strftime("%b ") + rounds["Date"].dt.day.astype(str) + rounds["Date"].dt.strftime(", %Y")
+            + " · " + rounds["Course_Name"] + " (" + rounds["Layout"] + ")")
+    return base + n.where(doubles).map(lambda x: f" · R{x}" if isinstance(x, str) else "")
