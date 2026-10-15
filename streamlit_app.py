@@ -291,26 +291,30 @@ if view == "overview":
 
     with col1:
         st.subheader("Score trend over time")
-        fig = px.line(
-            rounds_f.sort_values("Date", kind="stable"),
-            x="Date", y=SCORE,
-            markers=True,
-            custom_data=["Round_ID"],
-            hover_data={"Course_Name": True, "Layout": True, "Holes": True,
-                        "Score_vs_Par": True, "Score_per_18": ":.1f", "Conditions": True},
-            labels={"Score_vs_Par": "Score vs par (raw)", "Score_per_18": "Score vs par (per 18)",
-                    "Course_Name": "Course"},
-        )
+        tr = rounds_f.sort_values(["Date", "Round_ID"], kind="stable").copy()
+        # A second round on the same day would sit on top of the first (a few px apart), and
+        # plotly treats every point under the cursor as equally close, so it could never be
+        # clicked. Nudge each later same-day round right on the x axis; the hover keeps the
+        # real date. A day is the smallest nudge that clears a marker at 375 px wide.
+        tr["_x"] = tr["Date"] + pd.to_timedelta(tr.groupby("Date").cumcount(), unit="D")
+        tr["_raw"] = tr["Score_vs_Par"].map(lambda v: f"{int(v):+d}")
+        tr["_p18"] = tr["Score_per_18"].map(lambda v: f"{v:+.1f}")
+        fig = go.Figure(go.Scatter(
+            x=tr["_x"], y=tr[SCORE], mode="lines+markers",
+            line=dict(color=COLOR_NEUTRAL, width=2), marker=dict(size=8, color=COLOR_NEUTRAL),
+            customdata=tr[["Round_ID", "Round_Label", "Holes", "_raw", "_p18", "Conditions"]].values,
+            hovertemplate=("<b>%{customdata[1]}</b><br>%{customdata[4]} per 18 · %{customdata[3]} raw over "
+                           "%{customdata[2]} holes<br>%{customdata[5]}<extra></extra>"),
+        ))
         fig.add_hline(y=0, line_dash="dash", line_color="gray")
-        fig.update_traces(line_color=COLOR_NEUTRAL, line_width=2,
-                          marker=dict(size=10, color=COLOR_NEUTRAL))
         fig.update_layout(
             height=350,
-            yaxis_title=f"Strokes vs par{SCORE_SUFFIX} (lower = better)",
+            yaxis_title=f"Strokes vs par{SCORE_SUFFIX}, lower = better",
             yaxis=dict(autorange="reversed"),
+            xaxis_title="Date",
             clickmode="event+select",
-            # Two rounds on one day share an x; "closest" makes a click pick the point under the cursor.
             hovermode="closest",
+            margin=dict(t=30),
         )
         trend_event = st.plotly_chart(fig, width="stretch", key="trend",
                                       on_select="rerun", selection_mode="points")
