@@ -57,7 +57,17 @@ STAT_LABELS = {
     "C1X_Pct": "C1X putting %", "C2_Pct": "C2 putting %", "Scramble_Pct": "Scramble %",
     "OB_Pct": "OB rate",
 }
-PCT = lambda label, **kw: st.column_config.NumberColumn(label, format="percent", **kw)
+# Rates are stored 0-1. Tables show whole percents: scale the display copy with as_pct()
+# and use PCT() for the column ("percent" format alone shows 66.67%).
+PCT = lambda label, **kw: st.column_config.NumberColumn(label, format="%.0f%%", **kw)
+
+
+def as_pct(df, cols):
+    out = df.copy()
+    for c in cols:
+        if c in out.columns:
+            out[c] = out[c] * 100
+    return out
 RAW_COLUMN_CONFIG = {
     "Date": st.column_config.DateColumn("Date", format="YYYY-MM-DD"),
     "Course_Name": "Course", "Layout": "Layout", "Holes": "Holes", "Course_Par": "Course par",
@@ -343,7 +353,7 @@ if view == "overview":
         .reset_index().sort_values("Avg_score")
     )
     st.dataframe(
-        course_stats, width="stretch", hide_index=True,
+        as_pct(course_stats, ["Avg_C1R", "Avg_C1X", "Avg_Fairway", "Avg_OB"]), width="stretch", hide_index=True,
         column_config={
             "Course_Name": "Course", "Rounds": "Rounds",
             "Avg_score": st.column_config.NumberColumn(f"Avg score{SCORE_SUFFIX}", format="%+.1f"),
@@ -750,15 +760,16 @@ if view == "courses":
 
         st.subheader("Every hole")
         st.dataframe(
-            per_hole.drop(columns="Hole_Pos"), width="stretch", hide_index=True,
+            as_pct(per_hole.drop(columns="Hole_Pos"), ["Birdie_rate", "Bogey_rate", "OB_rate"]),
+            width="stretch", hide_index=True,
             column_config={
                 "Hole": "Hole", "Par": "Par",
                 "Distance": st.column_config.NumberColumn("Distance (ft)", format="%d"),
                 "Rounds": "Rounds",
                 "Avg": st.column_config.NumberColumn("Avg vs par", format="%+.2f"),
-                "Birdie_rate": st.column_config.NumberColumn("Birdie rate", format="percent"),
-                "Bogey_rate": st.column_config.NumberColumn("Bogey+ rate", format="percent"),
-                "OB_rate": st.column_config.NumberColumn("OB rate", format="percent"),
+                "Birdie_rate": PCT("Birdie rate"),
+                "Bogey_rate": PCT("Bogey+ rate"),
+                "OB_rate": PCT("OB rate"),
             },
         )
 
@@ -899,7 +910,7 @@ if view == "distance":
 
         with col2:
             st.dataframe(
-                binned, width="stretch", hide_index=True,
+                as_pct(binned, ["Under_par_rate", "C1R_rate"]), width="stretch", hide_index=True,
                 column_config={
                     "dist_bin": "Distance", "n": "Holes",
                     "Avg_score": st.column_config.NumberColumn("Avg vs par", format="%+.2f"),
@@ -976,7 +987,7 @@ if view == "shots":
             st.plotly_chart(fig, width="stretch")
         with col2:
             st.dataframe(
-                agg, width="stretch", hide_index=True,
+                as_pct(agg, ["Fairway_rate", "C1R_rate", "OB_rate", "Under_par_rate"]), width="stretch", hide_index=True,
                 column_config={
                     "Shot_Type": "Tee shot", "Tee_shots": "Tee shots",
                     "Avg_score": st.column_config.NumberColumn("Avg vs par", format="%+.2f"),
@@ -1189,7 +1200,7 @@ if view == "model":
 # ─── Tab 6: Raw data ──────────────────────────────────────────────────────────
 if view == "data":
     st.subheader("Rounds")
-    st.dataframe(rounds_f.drop(columns=["Round_Label"]), width="stretch", hide_index=True,
+    st.dataframe(as_pct(rounds_f.drop(columns=["Round_Label"]), list(STAT_LABELS)), width="stretch", hide_index=True,
                  column_config=RAW_COLUMN_CONFIG)
     st.subheader("Holes")
     st.dataframe(holes_f.drop(columns=[c for c in holes_f.columns if c.endswith("_bin")]),
