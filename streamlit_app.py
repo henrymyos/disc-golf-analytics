@@ -143,6 +143,8 @@ if "_url_loaded" not in st.session_state:
     st.session_state["view"] = qp.get("view") if qp.get("view") in SECTIONS else "overview"
     if qp.get("round") in set(rounds["Round_ID"]):
         st.session_state["round_pick"] = qp.get("round")
+        st.session_state["heat_round"] = qp.get("round")
+        st.session_state["_url_explore"] = qp.get("round")
     st.session_state["_url_loaded"] = True
 
 st.sidebar.title("Filters")
@@ -299,7 +301,8 @@ view = st.segmented_control(
     "Section", options=list(SECTIONS), format_func=SECTIONS.get, key="view",
     on_change=_keep_view, label_visibility="collapsed",
 ) or "overview"
-sync_url(st.session_state.get("round_pick") if view == "overview" else None)
+# Overview and the courses explorer each keep their open round in ?round=.
+sync_url({"overview": st.session_state.get("round_pick"), "courses": st.session_state.get("heat_round")}.get(view))
 st.write("")
 
 # ─── Tab 1: Overview ──────────────────────────────────────────────────────────
@@ -724,6 +727,12 @@ if view == "courses":
         "Cells show the score vs par (E = par), so the colour is never the only signal."
     )
     course_counts = rounds_f["Course_Name"].value_counts()
+    # A shared ?view=courses&round=… link opens the explorer on that round's course and layout.
+    url_rid = st.session_state.pop("_url_explore", None)
+    if url_rid in set(rounds_f["Round_ID"]):
+        ur = rounds_f.loc[rounds_f["Round_ID"] == url_rid].iloc[0]
+        st.session_state["explore_course"] = ur["Course_Name"]
+        st.session_state["explore_layout"] = ur["Layout"]
     ccol, lcol = st.columns(2)
     x_course = ccol.selectbox(
         "Course", sorted(course_counts.index), key="explore_course",
@@ -745,6 +754,8 @@ if view == "courses":
     if len(sel_rounds) == 1:
         only = sel_rounds.iloc[0]
         st.info("This layout has been played once, so here's that round's scorecard.")
+        st.session_state["heat_round"] = only["Round_ID"]
+        sync_url(only["Round_ID"])
         st.markdown(
             f"**{only['Round_Label']}** · **{int(only['Score_vs_Par']):+d}** "
             f"({only['Score_per_18']:+.1f} per 18) · {only['Conditions']}"
@@ -790,14 +801,21 @@ if view == "courses":
         if row_labels.str.endswith("†").any():
             st.caption("† This hole label appears at more than one position in the round, so each gets its own "
                        "row in the order played. What it is is a data question for Henry.")
-        heat_pts = [p for p in (heat_event.selection.points if heat_event else []) if p.get("customdata")]
-        if heat_pts:
-            hid = heat_pts[0]["customdata"][0]
-            if hid in set(z.columns):
-                hr = rounds.loc[rounds["Round_ID"] == hid].iloc[0]
-                st.markdown(f"**{hr['Round_Label']}** · **{int(hr['Score_vs_Par']):+d}** "
-                            f"({hr['Score_per_18']:+.1f} per 18) · {hr['Conditions']}")
-                st.markdown(scorecard_html(holes[holes["Round_ID"] == hid], SCORE_COLORS), unsafe_allow_html=True)
+        # Only a new click changes the round, so one opened from the URL survives other reruns.
+        heat_picked = tuple(p["customdata"][0] for p in (heat_event.selection.points if heat_event else [])
+                            if p.get("customdata"))
+        if heat_picked != st.session_state.get("_heat_pick", ()):
+            st.session_state["heat_round"] = heat_picked[0] if heat_picked else None
+        st.session_state["_heat_pick"] = heat_picked
+        hid = st.session_state.get("heat_round")
+        if hid not in set(z.columns):
+            hid = st.session_state["heat_round"] = None
+        sync_url(hid)
+        if hid:
+            hr = rounds.loc[rounds["Round_ID"] == hid].iloc[0]
+            st.markdown(f"**{hr['Round_Label']}** · **{int(hr['Score_vs_Par']):+d}** "
+                        f"({hr['Score_per_18']:+.1f} per 18) · {hr['Conditions']}")
+            st.markdown(scorecard_html(holes[holes["Round_ID"] == hid], SCORE_COLORS), unsafe_allow_html=True)
 
         # Only holes that average over par count as "tough".
         tough = per_hole[per_hole["Avg"] > 0].sort_values(["Avg", "OB_rate"], ascending=False).head(3)
