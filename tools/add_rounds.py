@@ -172,7 +172,7 @@ for r in rs:
         bcols[1].button("Rest are FH", key=f"fh_{rid}", on_click=fill_rest, args=(rid, "FH"), disabled=done == n)
         if source:
             bcols[2].button(f"Copy from {source[0]}", key=f"copy_{rid}", on_click=copy_shots, args=(source[1], rid),
-                            help=f"Same course and layout — copies those tee shots (you can still change any hole)")
+                            help="Same course and layout — copies those tee shots (you can still change any hole)")
         bcols[3].button("Don't log this round", key=f"drop_{rid}", on_click=drop, args=(rid,))
         missing = [x for x, ok in (("tee shots", done == n), ("course", course.strip()), ("conditions", cond)) if not ok]
         if bcols[4].button(f"Save round ({done}/{n} tee shots)", key=f"save_{rid}", type="primary",

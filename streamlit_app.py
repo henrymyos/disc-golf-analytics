@@ -595,7 +595,7 @@ if view == "drivers":
                     f"Treat this as a working hypothesis, not a conclusion."
                 )
             lines = [
-                f"**More negative correlation = stat improves my score.**\n",
+                "**More negative correlation = stat improves my score.**\n",
                 f"- **{stat_names.get(strongest, strongest)} is currently my strongest predictor** "
                 f"({sv:+.2f}). When this stat goes up, my score tends to be {direction}.",
                 f"- **{stat_names.get(weakest, weakest)}** has the weakest relationship "
