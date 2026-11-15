@@ -619,12 +619,13 @@ if view == "drivers":
                 f"Widen the filters to see how the correlations moved.")
     else:
         @st.cache_data
-        def _history(ids: tuple, score: str):
+        def _history(ids: tuple, score: str, data_mtimes: tuple):  # mtimes: an edited CSV row must not serve a stale history
             sub = rounds[rounds["Round_ID"].isin(ids)]
             return (correlation_history(sub, score, hist_stats, MIN_ROUNDS_FOR_HISTORY),
                     bootstrap_band(sub, score, hist_stats))
 
-        hist, band = _history(tuple(sorted(rounds_f["Round_ID"])), SCORE)
+        hist, band = _history(tuple(sorted(rounds_f["Round_ID"])), SCORE,
+                              (os.path.getmtime(ROUNDS_PATH), os.path.getmtime(HOLES_PATH)))
         HIST_COLORS = {"Fairway_Pct": COLOR_NEUTRAL, "C1R_Pct": COLOR_GOOD, "C2R_Pct": "#a35bd6",
                        "C1X_Pct": COLOR_ACCENT, "OB_Pct": COLOR_BAD}
         HIST_DASH = {"Fairway_Pct": "solid", "C1R_Pct": "solid", "C2R_Pct": "dash",
