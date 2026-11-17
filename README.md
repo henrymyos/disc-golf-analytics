@@ -27,7 +27,6 @@ Things that look off in the data. Nothing here has been changed; scores, labels 
 - **Kaposia, 2026-07-13:** `Course_Par` is 58 but the hole pars add up to 59. The score (−5) matches the holes.
 - **Fairway % doesn't match the hole rows** on 2026-07-24 and 07-26 Champions Landing (0.75 / 0.50 vs 0.72 / 0.44 from the holes), 08-02 and 08-03 Pickard Park (0.556 / 0.421 vs 0.500 / 0.389; 0.421 is 8 of 19) and 08-11 Bunker (0.611 vs 0.667).
 - **C2R % on 2026-06-14 Blue Ribbon Pines** is 0.519 (14 of 27) but the hole rows give 0.481 (13 of 27).
-- **Conditions** has both "Slight wind" and "Slight Wind", which show up as two options in the Conditions filter.
 - Should rounds get a **Round type** column (tournament / casual)? It would make a good filter, but it can't be inferred reliably from Notes.
 
 ## Tech stack

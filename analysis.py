@@ -40,6 +40,10 @@ def add_per_18(rounds: pd.DataFrame) -> pd.DataFrame:
 
 def load_tables(rounds_path: str = ROUNDS_PATH, holes_path: str = HOLES_PATH):
     rounds = pd.read_csv(rounds_path, parse_dates=["Date"])
+    # "Slight wind" / "Slight Wind" are one condition: merge case variants into the most used spelling.
+    cond_key = rounds["Conditions"].str.lower()
+    spelling = rounds["Conditions"].groupby(cond_key).agg(lambda s: s.value_counts().index[0])
+    rounds["Conditions"] = cond_key.map(spelling)
     holes = pd.read_csv(holes_path, parse_dates=["Date"], dtype={"Hole": str})
     unknown = set(holes["Score_Label"].unique()) - set(LABEL_OFFSETS) - {"ACE"}
     if unknown:

@@ -95,3 +95,10 @@ def test_correlation_history_ends_at_current(tables):
     assert (last - now).abs().max() < 1e-12
     band = a.bootstrap_band(rounds, a.PER_18).set_index("Stat")
     assert ((band["Low"] <= band["Correlation"]) & (band["Correlation"] <= band["High"])).all()
+
+
+def test_conditions_merge_case_variants(tables):
+    rounds, _ = tables
+    conds = rounds["Conditions"].dropna()
+    assert conds.str.lower().nunique() == conds.nunique()
+    assert "Slight Wind" not in set(conds) and (conds == "Slight wind").sum() == 13
