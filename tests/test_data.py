@@ -142,3 +142,16 @@ def test_uploaded_rounds_with_blank_conditions_load():
     # An all-blank Conditions column reads as float NaN; it used to crash on .str.lower().
     rounds, _ = a.load_tables(*_template_files(blank_conditions=True))
     assert rounds["Conditions"].isna().all() and (rounds["Layout"] == "Default").all()
+
+
+def test_uploaded_flags_and_labels_are_case_insensitive():
+    clean = a.load_tables(*_template_files())[1]
+    r, h = _template_files()
+    df = pd.read_csv(h, dtype={"Hole": str})
+    for c in ("Score_Label", "Fairway", "C1R", "C2R", "OB"):
+        df[c] = df[c].str.title() + " "
+    h = io.BytesIO(df.to_csv(index=False).encode())
+    h.name = "my_holes.csv"
+    messy = a.load_tables(r, h)[1]
+    pd.testing.assert_frame_equal(messy, clean)
+    assert clean["C1R_bin"].sum() > 0  # the round has made putts, so a lowercase "yes" can't hide as 0
