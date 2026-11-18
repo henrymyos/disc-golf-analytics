@@ -1,0 +1,3 @@
+[server]
+# Uploaded round CSVs are ~100 KB; cap uploads well below the 200 MB default to protect the free-tier app.
+maxUploadSize = 5

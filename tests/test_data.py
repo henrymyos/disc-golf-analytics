@@ -1,8 +1,10 @@
 """Run from the repo root: uv run --with-requirements requirements.txt --with pytest pytest -q"""
+import io
 import os
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -102,3 +104,33 @@ def test_conditions_merge_case_variants(tables):
     conds = rounds["Conditions"].dropna()
     assert conds.str.lower().nunique() == conds.nunique()
     assert "Slight Wind" not in set(conds) and (conds == "Slight wind").sum() == 13
+
+
+def _template_files(drop_col=None, label=None):
+    """My first round as in-memory uploads, like the dashboard's 'Use your own rounds' templates."""
+    r = pd.read_csv(a.ROUNDS_PATH).head(1)
+    h = pd.read_csv(a.HOLES_PATH, dtype={"Hole": str})
+    h = h[h["Round_ID"].isin(r["Round_ID"])]
+    if drop_col:
+        h = h.drop(columns=drop_col)
+    if label:
+        h.loc[h.index[0], "Score_Label"] = label
+    files = []
+    for df, name in ((r, "my_rounds.csv"), (h, "my_holes.csv")):
+        f = io.BytesIO(df.to_csv(index=False).encode())
+        f.name = name
+        files.append(f)
+    return files
+
+
+def test_load_tables_from_uploaded_files():
+    rounds, holes = a.load_tables(*_template_files())
+    assert len(rounds) == 1 and len(holes) == int(rounds["Holes"].iloc[0])
+    assert holes["Strokes"].sum() == rounds["Course_Par"].iloc[0] + rounds["Score_vs_Par"].iloc[0]
+
+
+def test_uploaded_files_with_problems_name_the_file():
+    with pytest.raises(a.DataError, match="my_holes.csv is missing column.*C1R"):
+        a.load_tables(*_template_files(drop_col="C1R"))
+    with pytest.raises(a.DataError, match="Unknown Score_Label values in my_holes.csv"):
+        a.load_tables(*_template_files(label="ALBATROSS"))

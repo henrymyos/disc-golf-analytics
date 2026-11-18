@@ -44,6 +44,7 @@ Things that look off in the data. Nothing here has been changed; scores, labels 
 ├── analysis.py             # Loading, checks and the numbers behind each view (shared with tools/)
 ├── scorecard.py            # Hole-by-hole scorecard HTML
 ├── requirements.txt        # Dependencies for deployment
+├── .streamlit/config.toml  # 5 MB upload cap
 ├── data/
 │   ├── rounds_cleaned.csv  # One row per round
 │   └── holes_cleaned.csv   # One row per hole
@@ -77,6 +78,7 @@ Filters (course, layout, conditions, 18-hole rounds only, dates, per-18 / raw sc
 - **Shot Type** — tee-shot BH vs FH comparison across avg score, fairway hit rate, C1R rate, and OB rate, with par-class breakdown.
 - **Score Model** — scikit-learn linear / ridge regression predicting round score per 18 from skill stats, with leave-one-out CV, coefficient inspection, and a what-if slider for simulating a round.
 - **Raw Data** — the underlying rounds and holes tables.
+- **Use your own rounds** (sidebar) — download the rounds and holes templates (my first round, filled in), upload your own two CSVs and every section runs on them. Session only: nothing is saved. Files are checked for missing columns, unknown score labels and holes that don't add up to their round; a bad file shows why and keeps my data.
 
 ## Adding rounds
 
@@ -107,4 +109,3 @@ Tests: `uv run --with-requirements requirements.txt --with pytest pytest -q`. Af
 
 - Keep building the par-4 and par-5 samples (counts are in the summary above).
 - Add drive-distance and approach-distance tracking per hole.
-- Let students upload their own rounds (CSV template, session-only) for a stats audit.

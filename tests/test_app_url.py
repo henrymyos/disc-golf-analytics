@@ -39,3 +39,29 @@ def test_unknown_round_is_ignored():
     assert not at.exception
     # The default explorer course has one round, so its own scorecard (not "nope") is what the link holds.
     assert at.query_params.get("round") != "nope"
+
+
+def _first_round_csvs():
+    import pandas as pd
+    root = Path(APP).parent
+    r = pd.read_csv(root / "data/rounds_cleaned.csv").head(1)
+    h = pd.read_csv(root / "data/holes_cleaned.csv", dtype={"Hole": str})
+    return r.to_csv(index=False).encode(), h[h["Round_ID"].isin(r["Round_ID"])].to_csv(index=False).encode()
+
+
+def test_own_rounds_upload_runs_dashboard_on_them_and_bad_files_fall_back():
+    rb, hb = _first_round_csvs()
+    at = run(view="overview")
+    full = at.sidebar.markdown
+    at.file_uploader(key="up_rounds").upload("mine.csv", rb, "text/csv")
+    at.file_uploader(key="up_holes").upload("mine_holes.csv", hb, "text/csv")
+    at.run()
+    assert not at.exception
+    assert any("Showing your uploaded rounds (1 rounds" in i.value for i in at.info)
+    assert any("1 round ·" in m.value for m in at.sidebar.markdown)
+    # A holes file that doesn't add up keeps Henry's data and says why.
+    at.file_uploader(key="up_holes").upload("mine_holes.csv", hb.replace(b",PAR,", b",BIRDIE,", 1), "text/csv")
+    at.run()
+    assert not at.exception
+    assert any("still Henry's data" in e.value and "mine_holes.csv" in e.value for e in at.error)
+    assert [m.value for m in at.sidebar.markdown] == [m.value for m in full]

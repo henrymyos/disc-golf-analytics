@@ -3,6 +3,8 @@ Disc Golf Performance Analytics
 A personal analytics dashboard for tracking and analyzing my disc golf rounds.
 """
 
+import hashlib
+import io
 import os
 
 import numpy as np
@@ -86,14 +88,58 @@ def load_data(rounds_mtime: float, holes_mtime: float):
     return load_tables(ROUNDS_PATH, HOLES_PATH)
 
 
+@st.cache_data(max_entries=8)
+def load_uploaded(rounds_bytes: bytes, holes_bytes: bytes, rounds_name: str, holes_name: str):
+    r, h = io.BytesIO(rounds_bytes), io.BytesIO(holes_bytes)
+    r.name, h.name = rounds_name, holes_name
+    return load_tables(r, h)
+
+
+@st.cache_data
+def templates():
+    """My first round and its holes as filled-in example CSVs."""
+    r = pd.read_csv(ROUNDS_PATH).head(1)
+    h = pd.read_csv(HOLES_PATH, dtype={"Hole": str})
+    return r.to_csv(index=False), h[h["Round_ID"].isin(r["Round_ID"])].to_csv(index=False)
+
+
+DATA_MTIMES = (os.path.getmtime(ROUNDS_PATH), os.path.getmtime(HOLES_PATH))
+DATA_KEY = DATA_MTIMES  # what caches of derived numbers key on, so they never mix datasets
+own_data = False
+with st.sidebar.expander("📤 Use your own rounds"):
+    st.caption("Upload a rounds CSV and a holes CSV in the same format as the templates and the whole "
+               "dashboard runs on your data. Session only: nothing is saved, and it's gone when you close the tab.")
+    rounds_tpl, holes_tpl = templates()
+    c1, c2 = st.columns(2)
+    c1.download_button("Rounds template", rounds_tpl, "rounds_template.csv", "text/csv")
+    c2.download_button("Holes template", holes_tpl, "holes_template.csv", "text/csv")
+    up_rounds = st.file_uploader("Rounds CSV", type="csv", key="up_rounds")
+    up_holes = st.file_uploader("Holes CSV", type="csv", key="up_holes")
+
 try:
-    rounds, holes = load_data(
-        os.path.getmtime(ROUNDS_PATH),
-        os.path.getmtime(HOLES_PATH),
-    )
+    rounds, holes = load_data(*DATA_MTIMES)
 except DataError as e:
     st.error(str(e))
     st.stop()
+
+if up_rounds and up_holes:
+    rb, hb = up_rounds.getvalue(), up_holes.getvalue()
+    try:
+        rounds, holes = load_uploaded(rb, hb, up_rounds.name, up_holes.name)
+        own_data = True
+        DATA_KEY = hashlib.sha256(rb + b"\0" + hb).hexdigest()
+    except (DataError, ValueError, KeyError, TypeError) as e:  # ParserError and bad dates are ValueErrors
+        st.error(f"Couldn't use your files, so this is still Henry's data. {e}")
+    else:
+        if rounds.empty:
+            st.error("Your rounds CSV has no rows, so this is still Henry's data.")
+            rounds, holes = load_data(*DATA_MTIMES)
+            own_data, DATA_KEY = False, DATA_MTIMES
+elif up_rounds or up_holes:
+    st.sidebar.info("Add the other CSV too to switch to your data.")
+if own_data:
+    st.info(f"Showing your uploaded rounds ({len(rounds)} rounds, {len(holes):,} holes), this session only. "
+            "Remove a file in the sidebar to go back to Henry's data.")
 
 # ─── Filters, section and URL state ───────────────────────────────────────────
 # Every filter and the section live in the URL (st.query_params), so a copied
@@ -111,6 +157,14 @@ SECTIONS = {
 ALL_COURSES = sorted(rounds["Course_Name"].unique())
 ALL_CONDITIONS = sorted(rounds["Conditions"].dropna().unique(), key=str.lower)
 MIN_DATE, MAX_DATE = rounds["Date"].min().date(), rounds["Date"].max().date()
+
+if st.session_state.get("_data_key", DATA_KEY) != DATA_KEY:
+    # Switched datasets (upload added or removed): drop filters and picks naming the old courses, dates and rounds.
+    for k in ("f_course", "f_layout", "f_conditions", "round_pick", "heat_round", "explore_course", "explore_layout",
+              "_heat_pick", "_trend_pick", "_url_explore", "_url_layout"):
+        st.session_state.pop(k, None)
+    st.session_state["f_dates"] = (MIN_DATE, MAX_DATE)
+st.session_state["_data_key"] = DATA_KEY
 
 
 def _match(values, options):
@@ -619,13 +673,13 @@ if view == "drivers":
                 f"Widen the filters to see how the correlations moved.")
     else:
         @st.cache_data
-        def _history(ids: tuple, score: str, data_mtimes: tuple):  # mtimes: an edited CSV row must not serve a stale history
+        def _history(ids: tuple, score: str, data_key):  # data_key: an edited or uploaded CSV must not serve a stale history
             sub = rounds[rounds["Round_ID"].isin(ids)]
             return (correlation_history(sub, score, hist_stats, MIN_ROUNDS_FOR_HISTORY),
                     bootstrap_band(sub, score, hist_stats))
 
         hist, band = _history(tuple(sorted(rounds_f["Round_ID"])), SCORE,
-                              (os.path.getmtime(ROUNDS_PATH), os.path.getmtime(HOLES_PATH)))
+                              DATA_KEY)
         HIST_COLORS = {"Fairway_Pct": COLOR_NEUTRAL, "C1R_Pct": COLOR_GOOD, "C2R_Pct": "#a35bd6",
                        "C1X_Pct": COLOR_ACCENT, "OB_Pct": COLOR_BAD}
         HIST_DASH = {"Fairway_Pct": "solid", "C1R_Pct": "solid", "C2R_Pct": "dash",
