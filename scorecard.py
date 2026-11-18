@@ -46,7 +46,7 @@ def scorecard_html(holes: pd.DataFrame, score_colors: dict[str, str]) -> str:
             mark = "<sup>†</sup>" if h["Hole"] in repeated else ""
             hole_cells.append(f"<th scope='col' style='{cell}'>{label}{mark}</th>")
             par_cells.append(f"<td style='{cell}'>{int(h['Par'])}</td>")
-            dist_cells.append(f"<td style='{cell}font-size:.8em'>{int(h['Distance'])}</td>")
+            dist_cells.append(f"<td style='{cell}font-size:.8em'>{int(h['Distance']) if pd.notna(h['Distance']) else '–'}</td>")
             rel = int(h["Score_vs_Par"])
             name = h["Score_Label"]
             if rel == 0 and name != "ACE":

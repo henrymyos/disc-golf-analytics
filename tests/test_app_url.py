@@ -67,12 +67,15 @@ def test_own_rounds_upload_runs_dashboard_on_them_and_bad_files_fall_back():
     assert [m.value for m in at.sidebar.markdown] == [m.value for m in full]
 
 
-def test_own_rounds_with_blank_conditions_run_every_section():
+def test_own_rounds_with_blank_optional_columns_run_every_section():
     import io
     import pandas as pd
     rb, hb = _first_round_csvs()
     r = pd.read_csv(io.BytesIO(rb))
-    r["Conditions"] = None
+    r[["Conditions", "Layout"]] = None
+    h = pd.read_csv(io.BytesIO(hb), dtype={"Hole": str})
+    h["Distance"] = None
+    hb = h.to_csv(index=False).encode()
     for view in ("overview", "strokes", "drivers", "courses", "distance", "shots", "model", "data"):
         at = run(view=view)
         at.file_uploader(key="up_rounds").upload("mine.csv", r.to_csv(index=False).encode(), "text/csv")
