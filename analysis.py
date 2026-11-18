@@ -38,16 +38,35 @@ def add_per_18(rounds: pd.DataFrame) -> pd.DataFrame:
     return rounds
 
 
-def load_tables(rounds_path: str = ROUNDS_PATH, holes_path: str = HOLES_PATH):
-    rounds = pd.read_csv(rounds_path, parse_dates=["Date"])
+# Every column the dashboard reads; uploaded CSVs are checked against these before anything else.
+ROUND_COLS = ["Date", "Course_Name", "Layout", "Holes", "Course_Par", "Score_vs_Par", "Fairway_Pct", "Scramble_Pct",
+              "C1R_Pct", "C2R_Pct", "C1X_Pct", "C2_Pct", "OB_Pct", "Conditions", "Notes", "Round_ID"]
+HOLE_COLS = ["Date", "Course_Name", "Hole", "Par", "Distance", "Score_Label", "Shot_Type", "Fairway", "C1R", "C2R",
+             "OB", "Round_ID", "Hole_Pos"]
+
+
+def _require(df: pd.DataFrame, cols: list[str], name: str) -> None:
+    missing = [c for c in cols if c not in df.columns]
+    if missing:
+        raise DataError(f"{name} is missing column(s): {', '.join(missing)}")
+
+
+def load_tables(rounds_path=ROUNDS_PATH, holes_path=HOLES_PATH):
+    """Paths or file-like objects (uploaded CSVs); a file-like object's .name is used in messages."""
+    rname, hname = getattr(rounds_path, "name", rounds_path), getattr(holes_path, "name", holes_path)
+    rounds = pd.read_csv(rounds_path)
+    _require(rounds, ROUND_COLS, rname)
+    rounds["Date"] = pd.to_datetime(rounds["Date"])
     # "Slight wind" / "Slight Wind" are one condition: merge case variants into the most used spelling.
     cond_key = rounds["Conditions"].str.lower()
     spelling = rounds["Conditions"].groupby(cond_key).agg(lambda s: s.value_counts().index[0])
     rounds["Conditions"] = cond_key.map(spelling)
-    holes = pd.read_csv(holes_path, parse_dates=["Date"], dtype={"Hole": str})
+    holes = pd.read_csv(holes_path, dtype={"Hole": str})
+    _require(holes, HOLE_COLS, hname)
+    holes["Date"] = pd.to_datetime(holes["Date"])
     unknown = set(holes["Score_Label"].unique()) - set(LABEL_OFFSETS) - {"ACE"}
     if unknown:
-        raise DataError(f"Unknown Score_Label values in {holes_path}: {sorted(unknown)}")
+        raise DataError(f"Unknown Score_Label values in {hname}: {sorted(unknown)}")
     # The course filter is built from the rounds table, so a hole row naming a course
     # that isn't there would be dropped from every hole-level stat without a trace.
     # That has happened before (a spreadsheet autofill incremented the course name),
@@ -55,7 +74,7 @@ def load_tables(rounds_path: str = ROUNDS_PATH, holes_path: str = HOLES_PATH):
     orphans = sorted(set(holes["Course_Name"]) - set(rounds["Course_Name"]))
     if orphans:
         raise DataError(
-            f"{holes_path} has hole rows for courses missing from {rounds_path}: "
+            f"{hname} has hole rows for courses missing from {rname}: "
             f"{orphans}. These would be silently excluded from every hole-level "
             f"stat — fix the course names before trusting any number here."
         )
@@ -74,7 +93,7 @@ def load_tables(rounds_path: str = ROUNDS_PATH, holes_path: str = HOLES_PATH):
         more = f"\n- …and {len(problems) - 15} more" if len(problems) > 15 else ""
         raise DataError(
             f"The hole rows don't add up to the round rows, so per-round numbers would be "
-            f"wrong. Fix these in {holes_path} / {rounds_path}:\n{shown}{more}"
+            f"wrong. Fix these in {hname} / {rname}:\n{shown}{more}"
         )
     holes = holes.sort_values(["Date", "Round_ID", "Hole_Pos"], kind="stable").reset_index(drop=True)
     return add_per_18(rounds), holes
