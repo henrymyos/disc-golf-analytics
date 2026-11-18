@@ -58,8 +58,10 @@ def load_tables(rounds_path=ROUNDS_PATH, holes_path=HOLES_PATH):
     _require(rounds, ROUND_COLS, rname)
     rounds["Date"] = pd.to_datetime(rounds["Date"])
     # "Slight wind" / "Slight Wind" are one condition: merge case variants into the most used spelling.
-    cond_key = rounds["Conditions"].str.lower()
-    spelling = rounds["Conditions"].groupby(cond_key).agg(lambda s: s.value_counts().index[0])
+    # An all-blank column reads as float NaN (no .str), so cast first; blanks stay NaN.
+    conditions = rounds["Conditions"].astype(str).where(rounds["Conditions"].notna())
+    cond_key = conditions.str.lower()
+    spelling = conditions.groupby(cond_key).agg(lambda s: s.value_counts().index[0])
     rounds["Conditions"] = cond_key.map(spelling)
     holes = pd.read_csv(holes_path, dtype={"Hole": str})
     _require(holes, HOLE_COLS, hname)
@@ -78,10 +80,8 @@ def load_tables(rounds_path=ROUNDS_PATH, holes_path=HOLES_PATH):
             f"{orphans}. These would be silently excluded from every hole-level "
             f"stat — fix the course names before trusting any number here."
         )
-    holes["Score_vs_Par"] = holes["Score_Label"].map(LABEL_OFFSETS)
     is_ace = holes["Score_Label"] == "ACE"
-    holes.loc[is_ace, "Score_vs_Par"] = 1 - holes.loc[is_ace, "Par"]
-    holes["Score_vs_Par"] = holes["Score_vs_Par"].astype(int)
+    holes["Score_vs_Par"] = holes["Score_Label"].map(LABEL_OFFSETS).where(~is_ace, 1 - holes["Par"]).astype(int)
     holes["Strokes"] = holes["Par"] + holes["Score_vs_Par"]
     holes["C1R_bin"] = (holes["C1R"] == "YES").astype(int)
     holes["C2R_bin"] = (holes["C2R"] == "YES").astype(int)

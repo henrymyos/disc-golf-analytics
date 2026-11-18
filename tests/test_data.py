@@ -106,11 +106,13 @@ def test_conditions_merge_case_variants(tables):
     assert "Slight Wind" not in set(conds) and (conds == "Slight wind").sum() == 13
 
 
-def _template_files(drop_col=None, label=None):
+def _template_files(drop_col=None, label=None, blank_conditions=False):
     """My first round as in-memory uploads, like the dashboard's 'Use your own rounds' templates."""
     r = pd.read_csv(a.ROUNDS_PATH).head(1)
     h = pd.read_csv(a.HOLES_PATH, dtype={"Hole": str})
     h = h[h["Round_ID"].isin(r["Round_ID"])]
+    if blank_conditions:
+        r["Conditions"] = None
     if drop_col:
         h = h.drop(columns=drop_col)
     if label:
@@ -134,3 +136,9 @@ def test_uploaded_files_with_problems_name_the_file():
         a.load_tables(*_template_files(drop_col="C1R"))
     with pytest.raises(a.DataError, match="Unknown Score_Label values in my_holes.csv"):
         a.load_tables(*_template_files(label="ALBATROSS"))
+
+
+def test_uploaded_rounds_with_blank_conditions_load():
+    # An all-blank Conditions column reads as float NaN; it used to crash on .str.lower().
+    rounds, _ = a.load_tables(*_template_files(blank_conditions=True))
+    assert rounds["Conditions"].isna().all()

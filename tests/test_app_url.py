@@ -65,3 +65,18 @@ def test_own_rounds_upload_runs_dashboard_on_them_and_bad_files_fall_back():
     assert not at.exception
     assert any("still Henry's data" in e.value and "mine_holes.csv" in e.value for e in at.error)
     assert [m.value for m in at.sidebar.markdown] == [m.value for m in full]
+
+
+def test_own_rounds_with_blank_conditions_run_every_section():
+    import io
+    import pandas as pd
+    rb, hb = _first_round_csvs()
+    r = pd.read_csv(io.BytesIO(rb))
+    r["Conditions"] = None
+    for view in ("overview", "strokes", "drivers", "courses", "distance", "shots", "model", "data"):
+        at = run(view=view)
+        at.file_uploader(key="up_rounds").upload("mine.csv", r.to_csv(index=False).encode(), "text/csv")
+        at.file_uploader(key="up_holes").upload("mine_holes.csv", hb, "text/csv")
+        at.run()
+        assert not at.exception, view
+        assert any("Showing your uploaded rounds" in i.value for i in at.info), view
