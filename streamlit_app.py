@@ -128,7 +128,7 @@ if up_rounds and up_holes:
         rounds, holes = load_uploaded(rb, hb, up_rounds.name, up_holes.name)
         own_data = True
         DATA_KEY = hashlib.sha256(rb + b"\0" + hb).hexdigest()
-    except (DataError, ValueError, KeyError, TypeError) as e:  # ParserError and bad dates are ValueErrors
+    except Exception as e:  # untrusted file: any failure to read it keeps my data and says why
         st.error(f"Couldn't use your files, so this is still Henry's data. {e}")
     else:
         if rounds.empty:
