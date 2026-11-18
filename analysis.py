@@ -57,6 +57,7 @@ def load_tables(rounds_path=ROUNDS_PATH, holes_path=HOLES_PATH):
     rounds = pd.read_csv(rounds_path)
     _require(rounds, ROUND_COLS, rname)
     rounds["Date"] = pd.to_datetime(rounds["Date"])
+    rounds["Layout"] = rounds["Layout"].astype(object).fillna("Default").astype(str)  # uploads from one-layout courses often leave it blank
     # "Slight wind" / "Slight Wind" are one condition: merge case variants into the most used spelling.
     # An all-blank column reads as float NaN (no .str), so cast first; blanks stay NaN.
     conditions = rounds["Conditions"].astype(str).where(rounds["Conditions"].notna())
