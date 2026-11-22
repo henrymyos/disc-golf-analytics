@@ -178,3 +178,12 @@ def test_uploaded_course_names_and_round_ids_ignore_stray_spaces():
     messy = a.load_tables(r, h)
     pd.testing.assert_frame_equal(messy[0], clean[0])
     pd.testing.assert_frame_equal(messy[1], clean[1])
+
+
+def test_uploaded_text_in_number_columns_names_the_column():
+    r, h = _template_files()
+    dr = pd.read_csv(r)
+    dr["Fairway_Pct"] = (dr["Fairway_Pct"] * 100).round(1).astype(str) + "%"
+    r = io.BytesIO(dr.to_csv(index=False).encode()); r.name = "my_rounds.csv"
+    with pytest.raises(a.DataError, match=r"my_rounds.csv column Fairway_Pct needs plain numbers.*%"):
+        a.load_tables(r, h)
