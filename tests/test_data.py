@@ -155,3 +155,13 @@ def test_uploaded_flags_and_labels_are_case_insensitive():
     messy = a.load_tables(r, h)[1]
     pd.testing.assert_frame_equal(messy, clean)
     assert clean["C1R_bin"].sum() > 0  # the round has made putts, so a lowercase "yes" can't hide as 0
+
+
+def test_uploaded_headers_with_stray_spaces_load():
+    clean = a.load_tables(*_template_files())
+    r, h = _template_files()
+    r = io.BytesIO(r.getvalue().replace(b"Date,", b"Date ,", 1)); r.name = "my_rounds.csv"
+    h = io.BytesIO(h.getvalue().replace(b",C1R,", b", C1R,", 1)); h.name = "my_holes.csv"
+    messy = a.load_tables(r, h)
+    pd.testing.assert_frame_equal(messy[0], clean[0])
+    pd.testing.assert_frame_equal(messy[1], clean[1])
