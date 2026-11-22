@@ -165,3 +165,16 @@ def test_uploaded_headers_with_stray_spaces_load():
     messy = a.load_tables(r, h)
     pd.testing.assert_frame_equal(messy[0], clean[0])
     pd.testing.assert_frame_equal(messy[1], clean[1])
+
+
+def test_uploaded_course_names_and_round_ids_ignore_stray_spaces():
+    clean = a.load_tables(*_template_files())
+    r, h = _template_files()
+    dr, dh = pd.read_csv(r), pd.read_csv(h, dtype={"Hole": str})
+    dh["Course_Name"] = dh["Course_Name"] + " "
+    dr["Round_ID"] = " " + dr["Round_ID"]
+    r = io.BytesIO(dr.to_csv(index=False).encode()); r.name = "my_rounds.csv"
+    h = io.BytesIO(dh.to_csv(index=False).encode()); h.name = "my_holes.csv"
+    messy = a.load_tables(r, h)
+    pd.testing.assert_frame_equal(messy[0], clean[0])
+    pd.testing.assert_frame_equal(messy[1], clean[1])

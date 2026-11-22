@@ -71,6 +71,10 @@ def load_tables(rounds_path=ROUNDS_PATH, holes_path=HOLES_PATH):
     # Uploads may say "yes" or "Birdie "; every check below compares uppercase ("YES", "BIRDIE").
     for c in ("Score_Label", "Fairway", "C1R", "C2R", "OB"):
         holes[c] = holes[c].astype(str).str.strip().str.upper().where(holes[c].notna())
+    # The tables join on these; a trailing space from a spreadsheet would read as a different course or round.
+    for df in (rounds, holes):
+        for c in ("Course_Name", "Round_ID"):
+            df[c] = df[c].astype(str).str.strip().where(df[c].notna())
     holes["Date"] = pd.to_datetime(holes["Date"])
     unknown = set(holes["Score_Label"].unique()) - set(LABEL_OFFSETS) - {"ACE"}
     if unknown:
