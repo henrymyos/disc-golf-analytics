@@ -55,6 +55,7 @@ def load_tables(rounds_path=ROUNDS_PATH, holes_path=HOLES_PATH):
     """Paths or file-like objects (uploaded CSVs); a file-like object's .name is used in messages."""
     rname, hname = getattr(rounds_path, "name", rounds_path), getattr(holes_path, "name", holes_path)
     rounds = pd.read_csv(rounds_path)
+    rounds.columns = rounds.columns.str.strip()  # spreadsheets leave "Date " headers that look right but don't match
     _require(rounds, ROUND_COLS, rname)
     rounds["Date"] = pd.to_datetime(rounds["Date"])
     rounds["Layout"] = rounds["Layout"].astype(object).fillna("Default").astype(str)  # uploads from one-layout courses often leave it blank
@@ -65,6 +66,7 @@ def load_tables(rounds_path=ROUNDS_PATH, holes_path=HOLES_PATH):
     spelling = conditions.groupby(cond_key).agg(lambda s: s.value_counts().index[0])
     rounds["Conditions"] = cond_key.map(spelling)
     holes = pd.read_csv(holes_path, dtype={"Hole": str})
+    holes.columns = holes.columns.str.strip()
     _require(holes, HOLE_COLS, hname)
     # Uploads may say "yes" or "Birdie "; every check below compares uppercase ("YES", "BIRDIE").
     for c in ("Score_Label", "Fairway", "C1R", "C2R", "OB"):
