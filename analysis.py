@@ -51,12 +51,27 @@ def _require(df: pd.DataFrame, cols: list[str], name: str) -> None:
         raise DataError(f"{name} is missing column(s): {', '.join(missing)}")
 
 
+ROUND_NUM = ["Holes", "Course_Par", "Score_vs_Par", "Fairway_Pct", "Scramble_Pct", "C1R_Pct", "C2R_Pct", "C1X_Pct",
+             "C2_Pct", "OB_Pct"]
+HOLE_NUM = ["Par", "Distance", "Hole_Pos"]
+
+
+def _require_numbers(df: pd.DataFrame, cols: list[str], name: str) -> None:
+    """Blank cells are fine; text like "88.9%" would load and then break every chart, so say where it is."""
+    for c in cols:
+        bad = df[c].notna() & pd.to_numeric(df[c], errors="coerce").isna()
+        if bad.any():
+            raise DataError(f"{name} column {c} needs plain numbers (fractions like 0.889 for percentages); "
+                            f"found {sorted(df.loc[bad, c].astype(str).unique())[:5]}")
+
+
 def load_tables(rounds_path=ROUNDS_PATH, holes_path=HOLES_PATH):
     """Paths or file-like objects (uploaded CSVs); a file-like object's .name is used in messages."""
     rname, hname = getattr(rounds_path, "name", rounds_path), getattr(holes_path, "name", holes_path)
     rounds = pd.read_csv(rounds_path)
     rounds.columns = rounds.columns.str.strip()  # spreadsheets leave "Date " headers that look right but don't match
     _require(rounds, ROUND_COLS, rname)
+    _require_numbers(rounds, ROUND_NUM, rname)
     rounds["Date"] = pd.to_datetime(rounds["Date"])
     rounds["Layout"] = rounds["Layout"].astype(object).fillna("Default").astype(str)  # uploads from one-layout courses often leave it blank
     # "Slight wind" / "Slight Wind" are one condition: merge case variants into the most used spelling.
@@ -68,6 +83,7 @@ def load_tables(rounds_path=ROUNDS_PATH, holes_path=HOLES_PATH):
     holes = pd.read_csv(holes_path, dtype={"Hole": str})
     holes.columns = holes.columns.str.strip()
     _require(holes, HOLE_COLS, hname)
+    _require_numbers(holes, HOLE_NUM, hname)
     # Uploads may say "yes" or "Birdie "; every check below compares uppercase ("YES", "BIRDIE").
     for c in ("Score_Label", "Fairway", "C1R", "C2R", "OB"):
         holes[c] = holes[c].astype(str).str.strip().str.upper().where(holes[c].notna())
